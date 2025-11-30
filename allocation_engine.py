@@ -4,14 +4,14 @@ import numpy as np
 from similarity_engine import calculate_room_similarity_score, get_student_features
 
 
-def allocate_rooms(excel_file_path, blacklist_pairs=None, use_similarity=True):
+def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None):
     """
     기숙사 방 배정 알고리즘
     
     Args:
         excel_file_path: xlsx 파일 경로
         blacklist_pairs: 블랙리스트 조합 리스트 [(학생1, 학생2), ...] - 이 학생들은 같은 방에 배정되지 않음
-        use_similarity: 유사도 기반 배정 사용 여부 (기본값: True)
+        selected_factors: 선택된 factor 컬럼 리스트 (예: ['factor1', 'factor2']) - None이면 유사도 미사용
         
     Returns:
         tuple: (room_id, failed_students) - 방 배정 결과와 실패한 좌석 목록
@@ -34,14 +34,13 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, use_similarity=True):
 
     df = pd.read_excel(excel_file_path)
 
-    # 유사도 계산에 사용할 특성 컬럼 확인
+    # 유사도 계산에 사용할 factor 컬럼 확인
     similarity_features = []
-    if use_similarity:
-        possible_features = ["ColdSensitivity", "NoiseSensitivity", "LightSensitivity", 
-                           "Cleanliness", "SocialLevel", "StudyTime", "SleepTime"]
-        for feature in possible_features:
-            if feature in df.columns:
-                similarity_features.append(feature)
+    if selected_factors:
+        # 선택된 factor 컬럼들만 사용
+        for factor in selected_factors:
+            if factor in df.columns:
+                similarity_features.append(factor)
     
     hallway_seats = ["seat1", "seat4"]  # 1,4번
     window_seats = ["seat2", "seat3"]  # 2,3번
@@ -145,7 +144,7 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, use_similarity=True):
             
             # 후보 학생이 있으면 유사도 기반으로 선택
             if candidate_students:
-                if use_similarity and similarity_features and current_members:
+                if similarity_features and current_members:
                     # 방 구성원들의 특성 벡터 추출
                     room_members_features = []
                     for member in current_members:

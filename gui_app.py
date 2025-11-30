@@ -38,6 +38,10 @@ class DormitoryAllocationGUI:
         self.current_room_id = None
         self.current_failed_students = None
         
+        # Factor 체크박스 변수들
+        self.factor_vars = {}
+        self.available_factors = []
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -57,7 +61,7 @@ class DormitoryAllocationGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(3, weight=1)
+        main_frame.rowconfigure(4, weight=1)
         
         # 제목 영역
         title_frame = ttk.Frame(main_frame)
@@ -211,13 +215,40 @@ class DormitoryAllocationGUI:
         )
         delete_button.grid(row=1, column=0, pady=(10, 0))
         
+        # Factor 선택 섹션
+        factor_frame = ttk.LabelFrame(
+            main_frame,
+            text=" 📊 Factor 선택 (유사도 기반 배정) ",
+            padding="15"
+        )
+        factor_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        factor_frame.columnconfigure(0, weight=1)
+        
+        # Factor 설명
+        factor_desc_label = ttk.Label(
+            factor_frame,
+            text="파일을 선택하면 사용 가능한 factor들이 표시됩니다. 체크한 factor들로 유사한 학생들끼리 배정됩니다.",
+            font=(DEFAULT_FONT_SMALL[0], 9)
+        )
+        factor_desc_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
+        try:
+            factor_desc_label.configure(style="Desc.TLabel")
+        except:
+            pass
+        
+        # Factor 체크박스 영역
+        self.factor_checkbox_frame = ttk.Frame(factor_frame)
+        self.factor_checkbox_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        
+        # Factor 체크박스는 파일 선택 후 동적으로 생성됨
+        
         # 결과 표시 섹션
         result_frame = ttk.LabelFrame(
             main_frame, 
             text=" 배정 결과 ", 
             padding="15"
         )
-        result_frame.grid(row=3, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        result_frame.grid(row=4, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(1, weight=1)
         
@@ -287,7 +318,7 @@ class DormitoryAllocationGUI:
         
         # 상태바
         status_frame = ttk.Frame(main_frame)
-        status_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(15, 0))
+        status_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(15, 0))
         
         self.status_var = tk.StringVar(value="준비됨 - 파일을 선택해주세요")
         status_bar = ttk.Label(
@@ -315,7 +346,70 @@ class DormitoryAllocationGUI:
             filename = os.path.basename(file_path)
             self.file_path_var.set(filename)
             self.run_button.config(state="normal")
-            self.status_var.set(f"✓ 파일 선택됨: {filename} - 배정 실행 버튼을 클릭하세요")
+            
+            # Factor 컬럼 감지 및 체크박스 생성
+            self.detect_and_create_factor_checkboxes(file_path)
+            
+            self.status_var.set(f"✓ 파일 선택됨: {filename} - Factor를 선택하고 배정 실행 버튼을 클릭하세요")
+    
+    def detect_and_create_factor_checkboxes(self, file_path):
+        """엑셀 파일에서 factor 컬럼들을 감지하고 체크박스 생성"""
+        try:
+            # 기존 체크박스 제거
+            for widget in self.factor_checkbox_frame.winfo_children():
+                widget.destroy()
+            self.factor_vars.clear()
+            self.available_factors.clear()
+            
+            # 엑셀 파일 읽기
+            df = pd.read_excel(file_path, nrows=1)  # 헤더만 읽기
+            
+            # factor1, factor2, ... 패턴으로 컬럼 찾기
+            import re
+            factor_pattern = re.compile(r'^factor\d+$', re.IGNORECASE)
+            
+            for col in df.columns:
+                if factor_pattern.match(str(col)):
+                    self.available_factors.append(col)
+            
+            # factor 컬럼들을 정렬 (factor1, factor2, ... 순서)
+            self.available_factors.sort(key=lambda x: int(re.search(r'\d+', x).group()))
+            
+            if self.available_factors:
+                # 체크박스 생성 (3열로 배치)
+                cols_per_row = 3
+                for idx, factor in enumerate(self.available_factors):
+                    row = idx // cols_per_row
+                    col = idx % cols_per_row
+                    
+                    var = tk.BooleanVar(value=True)  # 기본적으로 모두 체크
+                    self.factor_vars[factor] = var
+                    
+                    checkbox = ttk.Checkbutton(
+                        self.factor_checkbox_frame,
+                        text=factor,
+                        variable=var
+                    )
+                    checkbox.grid(row=row, column=col, sticky=tk.W, padx=10, pady=5)
+            else:
+                # Factor가 없으면 안내 메시지
+                no_factor_label = ttk.Label(
+                    self.factor_checkbox_frame,
+                    text="이 파일에는 factor 컬럼이 없습니다. (factor1, factor2, ... 형식)",
+                    font=(DEFAULT_FONT_SMALL[0], 9),
+                    foreground="gray"
+                )
+                no_factor_label.grid(row=0, column=0, sticky=tk.W)
+                
+        except Exception as e:
+            # 오류 발생 시 메시지 표시
+            error_label = ttk.Label(
+                self.factor_checkbox_frame,
+                text=f"Factor 감지 중 오류: {str(e)}",
+                font=(DEFAULT_FONT_SMALL[0], 9),
+                foreground="red"
+            )
+            error_label.grid(row=0, column=0, sticky=tk.W)
     
     def add_blacklist_pair(self):
         """블랙리스트 조합 추가"""
@@ -384,8 +478,18 @@ class DormitoryAllocationGUI:
             self.status_var.set("배정 중...")
             self.root.update()
             
-            # 배정 알고리즘 실행 (블랙리스트 포함)
-            room_id, failed_students = allocate_rooms(self.selected_file, self.blacklist_pairs)
+            # 선택된 factor들 추출
+            selected_factors = []
+            for factor, var in self.factor_vars.items():
+                if var.get():
+                    selected_factors.append(factor)
+            
+            # 배정 알고리즘 실행 (블랙리스트 및 선택된 factor 포함)
+            room_id, failed_students = allocate_rooms(
+                self.selected_file, 
+                self.blacklist_pairs,
+                selected_factors if selected_factors else None
+            )
             
             # 배정 결과 저장 (엑셀 저장용)
             self.current_room_id = room_id

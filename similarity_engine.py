@@ -17,15 +17,15 @@ def calculate_similarity_score(student1_features, student2_features):
     if len(student1_features) != len(student2_features):
         return 0.0
     
-    # NaN 값 처리
-    features1 = np.array([x if not pd.isna(x) else 5.0 for x in student1_features])
-    features2 = np.array([x if not pd.isna(x) else 5.0 for x in student2_features])
+    # NaN 값 처리 (1~5 척도의 중간값)
+    features1 = np.array([x if not pd.isna(x) else 3.0 for x in student1_features])
+    features2 = np.array([x if not pd.isna(x) else 3.0 for x in student2_features])
     
     # 유클리드 거리 계산
     distance = np.sqrt(np.sum((features1 - features2) ** 2))
     
-    # 최대 거리 (모든 특성이 1~10 범위이므로)
-    max_distance = np.sqrt(len(features1) * (10 - 1) ** 2)
+    # 최대 거리 (모든 특성이 1~5 범위이므로)
+    max_distance = np.sqrt(len(features1) * (5 - 1) ** 2)
     
     # 거리를 유사도 점수로 변환 (0~1 범위)
     similarity = 1.0 - (distance / max_distance) if max_distance > 0 else 1.0
@@ -69,13 +69,13 @@ def get_student_features(df, student_id, feature_columns):
     """
     row = df.loc[df["StudentID"] == student_id]
     if row.empty:
-        return [5.0] * len(feature_columns)  # 기본값 반환
+        return [3.0] * len(feature_columns)  # 기본값 반환 (1~5 척도의 중간값)
     
     features = []
     for col in feature_columns:
         value = row[col].values[0]
         if pd.isna(value) or value == "":
-            features.append(5.0)  # 기본값
+            features.append(3.0)  # 기본값 (1~5 척도의 중간값)
         else:
             features.append(float(value))
     
