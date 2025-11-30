@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
 import sys
+import pandas as pd
+from datetime import datetime
 from allocation_engine import allocate_rooms
 
 # 플랫폼별 폰트 설정
@@ -31,6 +33,10 @@ class DormitoryAllocationGUI:
         
         # 블랙리스트 조합 저장 (튜플의 리스트)
         self.blacklist_pairs = []
+        
+        # 배정 결과 저장 (나중에 엑셀로 저장하기 위해)
+        self.current_room_id = None
+        self.current_failed_students = None
         
         self.setup_ui()
         
@@ -213,11 +219,24 @@ class DormitoryAllocationGUI:
         )
         result_frame.grid(row=3, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         result_frame.columnconfigure(0, weight=1)
-        result_frame.rowconfigure(0, weight=1)
+        result_frame.rowconfigure(1, weight=1)
+        
+        # 저장 버튼 영역
+        save_button_frame = ttk.Frame(result_frame)
+        save_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        self.save_button = ttk.Button(
+            save_button_frame,
+            text="💾 엑셀로 저장",
+            command=self.save_to_excel,
+            state="disabled",
+            width=20
+        )
+        self.save_button.pack(side=tk.RIGHT)
         
         # 노트북 (탭) 생성
         notebook = ttk.Notebook(result_frame)
-        notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 탭 1: 방 배정 결과
         room_frame = ttk.Frame(notebook, padding="15")
@@ -368,10 +387,17 @@ class DormitoryAllocationGUI:
             # 배정 알고리즘 실행 (블랙리스트 포함)
             room_id, failed_students = allocate_rooms(self.selected_file, self.blacklist_pairs)
             
+            # 배정 결과 저장 (엑셀 저장용)
+            self.current_room_id = room_id
+            self.current_failed_students = failed_students
+            
             # 결과 표시
             self.display_results(room_id, failed_students)
             
-            self.status_var.set(f"배정 완료! (실패: {len(failed_students)}개)")
+            # 저장 버튼 활성화
+            self.save_button.config(state="normal")
+            
+            self.status_var.set(f"배정 완료! (실패: {len(failed_students)}개) - 엑셀로 저장 가능")
             
         except FileNotFoundError:
             messagebox.showerror("오류", "파일을 찾을 수 없습니다.")
@@ -427,6 +453,98 @@ class DormitoryAllocationGUI:
             self.failed_text.insert(tk.END, " " * 30 + "✓ 배정 실패한 좌석이 없습니다!\n")
             self.failed_text.insert(tk.END, " " * 25 + "모든 학생이 성공적으로 배정되었습니다.\n")
             self.failed_text.insert(tk.END, header + "\n")
+    
+    def save_to_excel(self):
+        """배정 결과를 엑셀 파일로 저장"""
+        if self.current_room_id is None:
+            messagebox.showwarning("경고", "저장할 배정 결과가 없습니다.")
+            return
+        
+        # 파일 저장 다이얼로그
+        default_filename = f"방배정결과_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        file_path = filedialog.asksaveasfilename(
+            title="엑셀 파일로 저장",
+            defaultextension=".xlsx",
+            filetypes=[
+                ("Excel files", "*.xlsx"),
+                ("All files", "*.*")
+            ],
+            initialfile=default_filename
+        )
+        
+        if not file_path:
+            return  # 사용자가 취소한 경우
+        
+        try:
+            self.status_var.set("엑셀 파일 저장 중...")
+            self.root.update()
+            
+            # 배정 결과를 DataFrame으로 변환
+            room_data = []
+            for i, room in enumerate(self.current_room_id, start=1):
+                room_data.append({
+                    "방 번호": i,
+                    "좌석1": room["seat1"] if room["seat1"] else "",
+                    "좌석2": room["seat2"] if room["seat2"] else "",
+                    "좌석3": room["seat3"] if room["seat3"] else "",
+                    "좌석4": room["seat4"] if room["seat4"] else ""
+                })
+            
+            df_rooms = pd.DataFrame(room_data)
+            
+            # 배정 실패 목록을 DataFrame으로 변환
+            if self.current_failed_students:
+                failed_data = []
+                for idx, failed in enumerate(self.current_failed_students, start=1):
+                    failed_data.append({
+                        "번호": idx,
+                        "실패 좌석": failed
+                    })
+                df_failed = pd.DataFrame(failed_data)
+            else:
+                df_failed = pd.DataFrame({"번호": [], "실패 좌석": []})
+            
+            # 엑셀 파일로 저장 (여러 시트 사용)
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                df_rooms.to_excel(writer, sheet_name='방 배정 결과', index=False)
+                df_failed.to_excel(writer, sheet_name='배정 실패 목록', index=False)
+                
+                # 시트별 컬럼 너비 조정
+                worksheet_rooms = writer.sheets['방 배정 결과']
+                worksheet_failed = writer.sheets['배정 실패 목록']
+                
+                # 컬럼 너비 자동 조정
+                for column in worksheet_rooms.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet_rooms.column_dimensions[column_letter].width = adjusted_width
+                
+                for column in worksheet_failed.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet_failed.column_dimensions[column_letter].width = adjusted_width
+            
+            filename = os.path.basename(file_path)
+            self.status_var.set(f"✓ 엑셀 파일 저장 완료: {filename}")
+            messagebox.showinfo("저장 완료", f"배정 결과가 성공적으로 저장되었습니다.\n\n파일: {filename}")
+            
+        except Exception as e:
+            messagebox.showerror("오류", f"엑셀 파일 저장 중 오류가 발생했습니다:\n{str(e)}")
+            self.status_var.set("엑셀 파일 저장 실패")
 
 
 def main():
