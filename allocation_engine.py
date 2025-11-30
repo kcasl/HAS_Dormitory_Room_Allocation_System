@@ -1,15 +1,17 @@
 import random as rd
 import pandas as pd
 import numpy as np
+from similarity_engine import calculate_room_similarity_score, get_student_features
 
 
-def allocate_rooms(excel_file_path, blacklist_pairs=None):
+def allocate_rooms(excel_file_path, blacklist_pairs=None, use_similarity=True):
     """
     기숙사 방 배정 알고리즘
     
     Args:
         excel_file_path: xlsx 파일 경로
         blacklist_pairs: 블랙리스트 조합 리스트 [(학생1, 학생2), ...] - 이 학생들은 같은 방에 배정되지 않음
+        use_similarity: 유사도 기반 배정 사용 여부 (기본값: True)
         
     Returns:
         tuple: (room_id, failed_students) - 방 배정 결과와 실패한 좌석 목록
@@ -32,6 +34,15 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None):
 
     df = pd.read_excel(excel_file_path)
 
+    # 유사도 계산에 사용할 특성 컬럼 확인
+    similarity_features = []
+    if use_similarity:
+        possible_features = ["ColdSensitivity", "NoiseSensitivity", "LightSensitivity", 
+                           "Cleanliness", "SocialLevel", "StudyTime", "SleepTime"]
+        for feature in possible_features:
+            if feature in df.columns:
+                similarity_features.append(feature)
+    
     hallway_seats = ["seat1", "seat4"]  # 1,4번
     window_seats = ["seat2", "seat3"]  # 2,3번
 
@@ -90,6 +101,9 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None):
 
             assigned_flag = False
 
+            # 유사도 기반 배정을 위한 후보 학생 리스트
+            candidate_students = []
+            
             # 배정 가능 여부 췤
             for student in remaining:
                 row = df.loc[df["StudentID"] == student]
@@ -126,13 +140,38 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None):
                 if blacklist_conflict:
                     continue
 
-                # 어싸인
-                room[seat] = student
-                assigned.add(student)
-                remaining.remove(student)
-                current_members.append(student)
+                # 조건을 만족하는 학생을 후보 리스트에 추가
+                candidate_students.append(student)
+            
+            # 후보 학생이 있으면 유사도 기반으로 선택
+            if candidate_students:
+                if use_similarity and similarity_features and current_members:
+                    # 방 구성원들의 특성 벡터 추출
+                    room_members_features = []
+                    for member in current_members:
+                        member_features = get_student_features(df, member, similarity_features)
+                        room_members_features.append(member_features)
+                    
+                    # 각 후보 학생의 유사도 점수 계산
+                    candidate_scores = []
+                    for candidate in candidate_students:
+                        candidate_features = get_student_features(df, candidate, similarity_features)
+                        similarity_score = calculate_room_similarity_score(room_members_features, candidate_features)
+                        candidate_scores.append((candidate, similarity_score))
+                    
+                    # 유사도 점수가 높은 순으로 정렬
+                    candidate_scores.sort(key=lambda x: x[1], reverse=True)
+                    selected_student = candidate_scores[0][0]
+                else:
+                    # 유사도 기반 배정을 사용하지 않으면 첫 번째 후보 선택
+                    selected_student = candidate_students[0]
+                
+                # 배정
+                room[seat] = selected_student
+                assigned.add(selected_student)
+                remaining.remove(selected_student)
+                current_members.append(selected_student)
                 assigned_flag = True
-                break
 
             # fail
             if not assigned_flag:
