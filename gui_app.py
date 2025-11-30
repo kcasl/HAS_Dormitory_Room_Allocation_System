@@ -1,7 +1,16 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
+import sys
 from allocation_engine import allocate_rooms
+
+# 플랫폼별 폰트 설정
+if sys.platform == "win32":
+    DEFAULT_FONT = ("Malgun Gothic",)
+    DEFAULT_FONT_SMALL = ("Malgun Gothic",)
+else:
+    DEFAULT_FONT = ("맑은 고딕",)
+    DEFAULT_FONT_SMALL = ("맑은 고딕",)
 
 
 class DormitoryAllocationGUI:
@@ -11,8 +20,11 @@ class DormitoryAllocationGUI:
         self.root.geometry("1100x850")
         self.root.resizable(True, True)
         
-        # 배경색 설정
-        self.root.configure(bg="a#f5f5f5")
+        # 배경색 설정 (윈도우 호환)
+        try:
+            self.root.configure(bg="#f5f5f5")
+        except:
+            pass  # 일부 시스템에서 색상 설정이 실패할 수 있음
         
         # 선택된 파일 경로
         self.selected_file = None
@@ -23,6 +35,14 @@ class DormitoryAllocationGUI:
         self.setup_ui()
         
     def setup_ui(self):
+        # ttk 스타일 초기화 (윈도우 호환)
+        try:
+            style = ttk.Style()
+            style.configure("Gray.TLabel", foreground="gray")
+            style.configure("Desc.TLabel", foreground="gray")
+        except:
+            pass  # 스타일 설정 실패 시 무시
+        
         # 메인 프레임
         main_frame = ttk.Frame(self.root, padding="20")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -40,17 +60,21 @@ class DormitoryAllocationGUI:
         title_label = ttk.Label(
             title_frame, 
             text="🏠 기숙사 방 배정 시스템", 
-            font=("맑은 고딕", 20, "bold")
+            font=(DEFAULT_FONT[0], 20, "bold")
         )
         title_label.pack()
         
         subtitle_label = ttk.Label(
             title_frame,
             text="Excel 파일을 업로드하여 자동으로 방을 배정합니다",
-            font=("맑은 고딕", 10),
-            foreground="gray"
+            font=(DEFAULT_FONT_SMALL[0], 10)
         )
         subtitle_label.pack(pady=(5, 0))
+        # ttk.Label은 foreground를 직접 지원하지 않으므로 스타일 사용
+        try:
+            subtitle_label.configure(style="Gray.TLabel")
+        except:
+            pass
         
         # 파일 선택 및 실행 섹션
         control_frame = ttk.LabelFrame(
@@ -69,7 +93,7 @@ class DormitoryAllocationGUI:
         ttk.Label(
             file_select_frame, 
             text="Excel 파일:", 
-            font=("맑은 고딕", 11)
+            font=(DEFAULT_FONT[0], 11)
         ).grid(row=0, column=0, padx=(0, 15), sticky=tk.W)
         
         self.file_path_var = tk.StringVar(value="파일을 선택해주세요")
@@ -77,7 +101,7 @@ class DormitoryAllocationGUI:
             file_select_frame,
             textvariable=self.file_path_var,
             state="readonly",
-            font=("맑은 고딕", 10),
+            font=(DEFAULT_FONT_SMALL[0], 10),
             width=50
         )
         file_path_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
@@ -116,10 +140,13 @@ class DormitoryAllocationGUI:
         desc_label = ttk.Label(
             blacklist_frame,
             text="같은 방에 배정되지 않아야 하는 학생 조합을 추가하세요 (예: 학생1과 학생2)",
-            font=("맑은 고딕", 9),
-            foreground="gray"
+            font=(DEFAULT_FONT_SMALL[0], 9)
         )
         desc_label.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 10))
+        try:
+            desc_label.configure(style="Desc.TLabel")
+        except:
+            pass
         
         # 입력 영역
         input_frame = ttk.Frame(blacklist_frame)
@@ -127,14 +154,14 @@ class DormitoryAllocationGUI:
         input_frame.columnconfigure(1, weight=1)
         input_frame.columnconfigure(3, weight=1)
         
-        ttk.Label(input_frame, text="학생 ID 1:", font=("맑은 고딕", 10)).grid(row=0, column=0, padx=(0, 5))
+        ttk.Label(input_frame, text="학생 ID 1:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=0, padx=(0, 5))
         self.blacklist_student1_var = tk.StringVar()
-        student1_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student1_var, width=10, font=("맑은 고딕", 10))
+        student1_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student1_var, width=10, font=(DEFAULT_FONT_SMALL[0], 10))
         student1_entry.grid(row=0, column=1, padx=(0, 15))
         
-        ttk.Label(input_frame, text="학생 ID 2:", font=("맑은 고딕", 10)).grid(row=0, column=2, padx=(0, 5))
+        ttk.Label(input_frame, text="학생 ID 2:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=2, padx=(0, 5))
         self.blacklist_student2_var = tk.StringVar()
-        student2_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student2_var, width=10, font=("맑은 고딕", 10))
+        student2_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student2_var, width=10, font=(DEFAULT_FONT_SMALL[0], 10))
         student2_entry.grid(row=0, column=3, padx=(0, 10))
         
         add_blacklist_button = ttk.Button(
@@ -162,7 +189,7 @@ class DormitoryAllocationGUI:
         
         self.blacklist_listbox = tk.Listbox(
             listbox_frame,
-            font=("맑은 고딕", 10),
+            font=(DEFAULT_FONT_SMALL[0], 10),
             height=5,
             yscrollcommand=scrollbar.set
         )
@@ -204,11 +231,14 @@ class DormitoryAllocationGUI:
             wrap=tk.WORD, 
             width=90, 
             height=30,
-            font=("맑은 고딕", 10),
-            bg="white",
+            font=(DEFAULT_FONT_SMALL[0], 10),
             relief=tk.FLAT,
             borderwidth=1
         )
+        try:
+            self.room_text.configure(bg="white")
+        except:
+            pass
         self.room_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 탭 2: 실패 목록
@@ -222,12 +252,18 @@ class DormitoryAllocationGUI:
             wrap=tk.WORD, 
             width=90, 
             height=30,
-            font=("맑은 고딕", 10),
-            bg="white",
-            foreground="#d32f2f",
+            font=(DEFAULT_FONT_SMALL[0], 10),
             relief=tk.FLAT,
             borderwidth=1
         )
+        try:
+            self.failed_text.configure(bg="white", foreground="#d32f2f")
+        except:
+            try:
+                # 윈도우에서 색상 이름으로 대체
+                self.failed_text.configure(bg="white", foreground="red")
+            except:
+                pass
         self.failed_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 상태바
@@ -241,7 +277,7 @@ class DormitoryAllocationGUI:
             relief=tk.SUNKEN,
             anchor=tk.W,
             padding="8",
-            font=("맑은 고딕", 9)
+            font=(DEFAULT_FONT_SMALL[0], 9)
         )
         status_bar.pack(fill=tk.X)
         
