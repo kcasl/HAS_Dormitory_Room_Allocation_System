@@ -252,18 +252,23 @@ class DormitoryAllocationGUI:
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(1, weight=1)
         
-        # 저장 버튼 영역
+        # 저장 버튼 영역 (더 눈에 띄게)
         save_button_frame = ttk.Frame(result_frame)
-        save_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        save_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        save_button_frame.columnconfigure(0, weight=1)
+        
+        # 저장 버튼을 중앙에 배치하고 더 크게
+        button_container = ttk.Frame(save_button_frame)
+        button_container.grid(row=0, column=0)
         
         self.save_button = ttk.Button(
-            save_button_frame,
-            text="💾 엑셀로 저장",
+            button_container,
+            text="💾 배정 결과를 엑셀로 저장",
             command=self.save_to_excel,
             state="disabled",
-            width=20
+            width=25
         )
-        self.save_button.pack(side=tk.RIGHT)
+        self.save_button.pack()
         
         # 노트북 (탭) 생성
         notebook = ttk.Notebook(result_frame)
@@ -610,14 +615,42 @@ class DormitoryAllocationGUI:
             
             # 엑셀 파일로 저장 (여러 시트 사용)
             with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                # 시트 1: 방 배정 결과
                 df_rooms.to_excel(writer, sheet_name='방 배정 결과', index=False)
+                
+                # 시트 2: 배정 실패 목록
                 df_failed.to_excel(writer, sheet_name='배정 실패 목록', index=False)
+                
+                # 시트 3: 배정 정보 요약
+                summary_data = {
+                    "항목": [
+                        "배정 일시",
+                        "총 방 수",
+                        "총 좌석 수",
+                        "배정된 학생 수",
+                        "배정 실패 좌석 수",
+                        "사용된 Factor",
+                        "블랙리스트 조합 수"
+                    ],
+                    "내용": [
+                        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        len(self.current_room_id),
+                        len(self.current_room_id) * 4,
+                        sum(1 for room in self.current_room_id for seat in room.values() if seat),
+                        len(self.current_failed_students),
+                        ", ".join(self.available_factors) if self.available_factors else "없음",
+                        len(self.blacklist_pairs)
+                    ]
+                }
+                df_summary = pd.DataFrame(summary_data)
+                df_summary.to_excel(writer, sheet_name='배정 정보', index=False)
                 
                 # 시트별 컬럼 너비 조정
                 worksheet_rooms = writer.sheets['방 배정 결과']
                 worksheet_failed = writer.sheets['배정 실패 목록']
+                worksheet_summary = writer.sheets['배정 정보']
                 
-                # 컬럼 너비 자동 조정
+                # 방 배정 결과 시트 컬럼 너비 조정
                 for column in worksheet_rooms.columns:
                     max_length = 0
                     column_letter = column[0].column_letter
@@ -630,6 +663,7 @@ class DormitoryAllocationGUI:
                     adjusted_width = min(max_length + 2, 50)
                     worksheet_rooms.column_dimensions[column_letter].width = adjusted_width
                 
+                # 배정 실패 목록 시트 컬럼 너비 조정
                 for column in worksheet_failed.columns:
                     max_length = 0
                     column_letter = column[0].column_letter
@@ -641,6 +675,19 @@ class DormitoryAllocationGUI:
                             pass
                     adjusted_width = min(max_length + 2, 50)
                     worksheet_failed.column_dimensions[column_letter].width = adjusted_width
+                
+                # 배정 정보 시트 컬럼 너비 조정
+                for column in worksheet_summary.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet_summary.column_dimensions[column_letter].width = adjusted_width
             
             filename = os.path.basename(file_path)
             self.status_var.set(f"✓ 엑셀 파일 저장 완료: {filename}")
