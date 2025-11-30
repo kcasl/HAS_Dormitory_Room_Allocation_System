@@ -3,16 +3,26 @@ import pandas as pd
 import numpy as np
 
 
-def allocate_rooms(excel_file_path):
+def allocate_rooms(excel_file_path, blacklist_pairs=None):
     """
     기숙사 방 배정 알고리즘
     
     Args:
         excel_file_path: xlsx 파일 경로
+        blacklist_pairs: 블랙리스트 조합 리스트 [(학생1, 학생2), ...] - 이 학생들은 같은 방에 배정되지 않음
         
     Returns:
         tuple: (room_id, failed_students) - 방 배정 결과와 실패한 좌석 목록
     """
+    if blacklist_pairs is None:
+        blacklist_pairs = []
+    
+    # 블랙리스트를 집합으로 변환 (양방향 체크를 위해)
+    blacklist_set = set()
+    for pair in blacklist_pairs:
+        # 정렬하여 양방향 체크 가능하도록
+        sorted_pair = tuple(sorted(pair))
+        blacklist_set.add(sorted_pair)
     std_id = [i for i in range(100)]
     rd.shuffle(std_id)
 
@@ -104,6 +114,16 @@ def allocate_rooms(excel_file_path):
                 # 이전 룸메 회피
                 prev_conflict = any(p in current_members for p in prev_list)
                 if prev_conflict:
+                    continue
+                
+                # 블랙리스트 체크 - 현재 학생과 방의 다른 학생이 블랙리스트에 있는지 확인
+                blacklist_conflict = False
+                for member in current_members:
+                    pair = tuple(sorted([student, member]))
+                    if pair in blacklist_set:
+                        blacklist_conflict = True
+                        break
+                if blacklist_conflict:
                     continue
 
                 # 어싸인

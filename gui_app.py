@@ -8,69 +8,183 @@ class DormitoryAllocationGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("기숙사 방 배정 시스템")
-        self.root.geometry("900x700")
+        self.root.geometry("1100x850")
         self.root.resizable(True, True)
+        
+        # 배경색 설정
+        self.root.configure(bg="a#f5f5f5")
         
         # 선택된 파일 경로
         self.selected_file = None
+        
+        # 블랙리스트 조합 저장 (튜플의 리스트)
+        self.blacklist_pairs = []
         
         self.setup_ui()
         
     def setup_ui(self):
         # 메인 프레임
-        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame = ttk.Frame(self.root, padding="20")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 그리드 가중치 설정
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(2, weight=1)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(3, weight=1)
         
-        # 제목
+        # 제목 영역
+        title_frame = ttk.Frame(main_frame)
+        title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 30))
+        
         title_label = ttk.Label(
-            main_frame, 
-            text="기숙사 방 배정 시스템", 
-            font=("맑은 고딕", 16, "bold")
+            title_frame, 
+            text="🏠 기숙사 방 배정 시스템", 
+            font=("맑은 고딕", 20, "bold")
         )
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        title_label.pack()
         
-        # 파일 선택 섹션
-        file_frame = ttk.LabelFrame(main_frame, text="Excel 파일 선택", padding="10")
-        file_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        file_frame.columnconfigure(1, weight=1)
+        subtitle_label = ttk.Label(
+            title_frame,
+            text="Excel 파일을 업로드하여 자동으로 방을 배정합니다",
+            font=("맑은 고딕", 10),
+            foreground="gray"
+        )
+        subtitle_label.pack(pady=(5, 0))
         
-        ttk.Label(file_frame, text="파일 경로:").grid(row=0, column=0, padx=(0, 10), sticky=tk.W)
+        # 파일 선택 및 실행 섹션
+        control_frame = ttk.LabelFrame(
+            main_frame, 
+            text=" 파일 선택 및 실행 ", 
+            padding="20"
+        )
+        control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        control_frame.columnconfigure(1, weight=1)
+        
+        # 파일 선택 영역
+        file_select_frame = ttk.Frame(control_frame)
+        file_select_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        file_select_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(
+            file_select_frame, 
+            text="Excel 파일:", 
+            font=("맑은 고딕", 11)
+        ).grid(row=0, column=0, padx=(0, 15), sticky=tk.W)
         
         self.file_path_var = tk.StringVar(value="파일을 선택해주세요")
-        file_path_label = ttk.Label(
-            file_frame, 
-            textvariable=self.file_path_var, 
-            foreground="gray",
-            wraplength=400
+        file_path_entry = ttk.Entry(
+            file_select_frame,
+            textvariable=self.file_path_var,
+            state="readonly",
+            font=("맑은 고딕", 10),
+            width=50
         )
-        file_path_label.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        file_path_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
         
         browse_button = ttk.Button(
-            file_frame, 
-            text="파일 선택", 
-            command=self.browse_file
+            file_select_frame, 
+            text="📁 파일 선택", 
+            command=self.browse_file,
+            width=15
         )
         browse_button.grid(row=0, column=2)
         
-        # 실행 버튼
-        run_button = ttk.Button(
-            main_frame,
-            text="배정 실행",
+        # 실행 버튼 영역 (중앙 정렬)
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=1, column=0, columnspan=3, pady=(5, 0))
+        
+        self.run_button = ttk.Button(
+            button_frame,
+            text="▶ 배정 실행",
             command=self.run_allocation,
-            state="disabled"
+            state="disabled",
+            width=20
         )
-        run_button.grid(row=1, column=2, padx=(10, 0), sticky=(tk.W, tk.E))
-        self.run_button = run_button
+        self.run_button.pack()
+        
+        # 블랙리스트 관리 섹션
+        blacklist_frame = ttk.LabelFrame(
+            main_frame,
+            text=" 🚫 블랙리스트 조합 관리 ",
+            padding="15"
+        )
+        blacklist_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        blacklist_frame.columnconfigure(1, weight=1)
+        
+        # 설명
+        desc_label = ttk.Label(
+            blacklist_frame,
+            text="같은 방에 배정되지 않아야 하는 학생 조합을 추가하세요 (예: 학생1과 학생2)",
+            font=("맑은 고딕", 9),
+            foreground="gray"
+        )
+        desc_label.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 10))
+        
+        # 입력 영역
+        input_frame = ttk.Frame(blacklist_frame)
+        input_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 10))
+        input_frame.columnconfigure(1, weight=1)
+        input_frame.columnconfigure(3, weight=1)
+        
+        ttk.Label(input_frame, text="학생 ID 1:", font=("맑은 고딕", 10)).grid(row=0, column=0, padx=(0, 5))
+        self.blacklist_student1_var = tk.StringVar()
+        student1_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student1_var, width=10, font=("맑은 고딕", 10))
+        student1_entry.grid(row=0, column=1, padx=(0, 15))
+        
+        ttk.Label(input_frame, text="학생 ID 2:", font=("맑은 고딕", 10)).grid(row=0, column=2, padx=(0, 5))
+        self.blacklist_student2_var = tk.StringVar()
+        student2_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student2_var, width=10, font=("맑은 고딕", 10))
+        student2_entry.grid(row=0, column=3, padx=(0, 10))
+        
+        add_blacklist_button = ttk.Button(
+            input_frame,
+            text="추가",
+            command=self.add_blacklist_pair,
+            width=10
+        )
+        add_blacklist_button.grid(row=0, column=4)
+        
+        # 블랙리스트 목록 표시
+        list_frame = ttk.Frame(blacklist_frame)
+        list_frame.grid(row=2, column=0, columnspan=4, sticky=(tk.W, tk.E, tk.N, tk.S))
+        list_frame.columnconfigure(0, weight=1)
+        list_frame.rowconfigure(0, weight=1)
+        
+        # 리스트박스와 스크롤바
+        listbox_frame = ttk.Frame(list_frame)
+        listbox_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        listbox_frame.columnconfigure(0, weight=1)
+        listbox_frame.rowconfigure(0, weight=1)
+        
+        scrollbar = ttk.Scrollbar(listbox_frame)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        self.blacklist_listbox = tk.Listbox(
+            listbox_frame,
+            font=("맑은 고딕", 10),
+            height=5,
+            yscrollcommand=scrollbar.set
+        )
+        self.blacklist_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.config(command=self.blacklist_listbox.yview)
+        
+        # 삭제 버튼
+        delete_button = ttk.Button(
+            list_frame,
+            text="선택 항목 삭제",
+            command=self.remove_blacklist_pair,
+            width=15
+        )
+        delete_button.grid(row=1, column=0, pady=(10, 0))
         
         # 결과 표시 섹션
-        result_frame = ttk.LabelFrame(main_frame, text="배정 결과", padding="10")
-        result_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
+        result_frame = ttk.LabelFrame(
+            main_frame, 
+            text=" 배정 결과 ", 
+            padding="15"
+        )
+        result_frame.grid(row=3, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(0, weight=1)
         
@@ -79,43 +193,57 @@ class DormitoryAllocationGUI:
         notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 탭 1: 방 배정 결과
-        room_frame = ttk.Frame(notebook, padding="10")
-        notebook.add(room_frame, text="방 배정 결과")
+        room_frame = ttk.Frame(notebook, padding="15")
+        notebook.add(room_frame, text="📋 방 배정 결과")
+        room_frame.columnconfigure(0, weight=1)
+        room_frame.rowconfigure(0, weight=1)
         
         # 스크롤 가능한 텍스트 영역
         self.room_text = scrolledtext.ScrolledText(
             room_frame, 
             wrap=tk.WORD, 
-            width=80, 
-            height=25,
-            font=("맑은 고딕", 10)
+            width=90, 
+            height=30,
+            font=("맑은 고딕", 10),
+            bg="white",
+            relief=tk.FLAT,
+            borderwidth=1
         )
-        self.room_text.pack(fill=tk.BOTH, expand=True)
+        self.room_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 탭 2: 실패 목록
-        failed_frame = ttk.Frame(notebook, padding="10")
-        notebook.add(failed_frame, text="배정 실패 목록")
+        failed_frame = ttk.Frame(notebook, padding="15")
+        notebook.add(failed_frame, text="⚠ 배정 실패 목록")
+        failed_frame.columnconfigure(0, weight=1)
+        failed_frame.rowconfigure(0, weight=1)
         
         self.failed_text = scrolledtext.ScrolledText(
             failed_frame, 
             wrap=tk.WORD, 
-            width=80, 
-            height=25,
+            width=90, 
+            height=30,
             font=("맑은 고딕", 10),
-            foreground="red"
+            bg="white",
+            foreground="#d32f2f",
+            relief=tk.FLAT,
+            borderwidth=1
         )
-        self.failed_text.pack(fill=tk.BOTH, expand=True)
+        self.failed_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 상태바
-        self.status_var = tk.StringVar(value="파일을 선택해주세요")
+        status_frame = ttk.Frame(main_frame)
+        status_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(15, 0))
+        
+        self.status_var = tk.StringVar(value="준비됨 - 파일을 선택해주세요")
         status_bar = ttk.Label(
-            main_frame, 
+            status_frame, 
             textvariable=self.status_var, 
             relief=tk.SUNKEN,
             anchor=tk.W,
-            padding="5"
+            padding="8",
+            font=("맑은 고딕", 9)
         )
-        status_bar.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        status_bar.pack(fill=tk.X)
         
     def browse_file(self):
         """파일 선택 다이얼로그"""
@@ -132,7 +260,60 @@ class DormitoryAllocationGUI:
             filename = os.path.basename(file_path)
             self.file_path_var.set(filename)
             self.run_button.config(state="normal")
-            self.status_var.set(f"파일 선택됨: {filename}")
+            self.status_var.set(f"✓ 파일 선택됨: {filename} - 배정 실행 버튼을 클릭하세요")
+    
+    def add_blacklist_pair(self):
+        """블랙리스트 조합 추가"""
+        try:
+            student1 = int(self.blacklist_student1_var.get().strip())
+            student2 = int(self.blacklist_student2_var.get().strip())
+            
+            if student1 == student2:
+                messagebox.showwarning("경고", "같은 학생 ID를 입력할 수 없습니다.")
+                return
+            
+            if student1 < 1 or student1 > 100 or student2 < 1 or student2 > 100:
+                messagebox.showwarning("경고", "학생 ID는 1부터 100 사이의 숫자여야 합니다.")
+                return
+            
+            # 정렬하여 중복 체크
+            pair = tuple(sorted([student1, student2]))
+            
+            # 중복 체크
+            if pair in self.blacklist_pairs:
+                messagebox.showinfo("알림", "이미 추가된 조합입니다.")
+                return
+            
+            # 추가
+            self.blacklist_pairs.append(pair)
+            self.update_blacklist_display()
+            
+            # 입력 필드 초기화
+            self.blacklist_student1_var.set("")
+            self.blacklist_student2_var.set("")
+            
+            self.status_var.set(f"블랙리스트 추가됨: 학생{student1} ↔ 학생{student2} (총 {len(self.blacklist_pairs)}개)")
+            
+        except ValueError:
+            messagebox.showerror("오류", "올바른 숫자를 입력해주세요.")
+    
+    def remove_blacklist_pair(self):
+        """블랙리스트 조합 삭제"""
+        selection = self.blacklist_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("경고", "삭제할 항목을 선택해주세요.")
+            return
+        
+        index = selection[0]
+        removed_pair = self.blacklist_pairs.pop(index)
+        self.update_blacklist_display()
+        self.status_var.set(f"블랙리스트 삭제됨: 학생{removed_pair[0]} ↔ 학생{removed_pair[1]} (총 {len(self.blacklist_pairs)}개)")
+    
+    def update_blacklist_display(self):
+        """블랙리스트 목록 업데이트"""
+        self.blacklist_listbox.delete(0, tk.END)
+        for pair in self.blacklist_pairs:
+            self.blacklist_listbox.insert(tk.END, f"학생{pair[0]} ↔ 학생{pair[1]}")
             
     def run_allocation(self):
         """배정 알고리즘 실행"""
@@ -148,8 +329,8 @@ class DormitoryAllocationGUI:
             self.status_var.set("배정 중...")
             self.root.update()
             
-            # 배정 알고리즘 실행
-            room_id, failed_students = allocate_rooms(self.selected_file)
+            # 배정 알고리즘 실행 (블랙리스트 포함)
+            room_id, failed_students = allocate_rooms(self.selected_file, self.blacklist_pairs)
             
             # 결과 표시
             self.display_results(room_id, failed_students)
@@ -169,40 +350,47 @@ class DormitoryAllocationGUI:
         self.room_text.delete(1.0, tk.END)
         
         # 방 배정 결과 출력
-        self.room_text.insert(tk.END, "=" * 70 + "\n")
-        self.room_text.insert(tk.END, "최종 방 배정 결과\n")
-        self.room_text.insert(tk.END, "=" * 70 + "\n\n")
+        header = "=" * 85
+        self.room_text.insert(tk.END, header + "\n")
+        self.room_text.insert(tk.END, " " * 30 + "최종 방 배정 결과\n")
+        self.room_text.insert(tk.END, header + "\n\n")
         
+        # 방 배정 결과를 표 형식으로 출력
         for i, room in enumerate(room_id, start=1):
-            room_info = f"방 {i:2d}번: "
-            seats = []
+            room_info = f"방 {i:2d}번"
+            seats_info = []
             for seat_name in ["seat1", "seat2", "seat3", "seat4"]:
                 student_id = room[seat_name]
+                seat_num = seat_name.replace("seat", "")
                 if student_id:
-                    seats.append(f"{seat_name}={student_id}")
+                    seats_info.append(f"좌석{seat_num}: 학생{student_id:3d}")
                 else:
-                    seats.append(f"{seat_name}=빈자리")
-            room_info += " | ".join(seats)
-            self.room_text.insert(tk.END, room_info + "\n")
+                    seats_info.append(f"좌석{seat_num}: 빈자리  ")
+            
+            # 더 읽기 쉬운 형식으로 출력
+            self.room_text.insert(tk.END, f"{room_info:8s} │ {' │ '.join(seats_info)}\n")
             
             # 5개 방마다 구분선
-            if i % 5 == 0:
-                self.room_text.insert(tk.END, "-" * 70 + "\n")
+            if i % 5 == 0 and i < len(room_id):
+                self.room_text.insert(tk.END, "-" * 85 + "\n")
         
         # 배정 실패 목록 탭 초기화
         self.failed_text.delete(1.0, tk.END)
         
         if failed_students:
-            self.failed_text.insert(tk.END, "=" * 70 + "\n")
-            self.failed_text.insert(tk.END, f"배정 실패 좌석 목록 (총 {len(failed_students)}개)\n")
-            self.failed_text.insert(tk.END, "=" * 70 + "\n\n")
+            header = "=" * 85
+            self.failed_text.insert(tk.END, header + "\n")
+            self.failed_text.insert(tk.END, f" " * 25 + f"배정 실패 좌석 목록 (총 {len(failed_students)}개)\n")
+            self.failed_text.insert(tk.END, header + "\n\n")
             
-            for failed in failed_students:
-                self.failed_text.insert(tk.END, f"  - {failed}\n")
+            for idx, failed in enumerate(failed_students, start=1):
+                self.failed_text.insert(tk.END, f"  {idx:2d}. {failed}\n")
         else:
-            self.failed_text.insert(tk.END, "=" * 70 + "\n")
-            self.failed_text.insert(tk.END, "배정 실패한 좌석이 없습니다!\n")
-            self.failed_text.insert(tk.END, "=" * 70 + "\n")
+            header = "=" * 85
+            self.failed_text.insert(tk.END, header + "\n")
+            self.failed_text.insert(tk.END, " " * 30 + "✓ 배정 실패한 좌석이 없습니다!\n")
+            self.failed_text.insert(tk.END, " " * 25 + "모든 학생이 성공적으로 배정되었습니다.\n")
+            self.failed_text.insert(tk.END, header + "\n")
 
 
 def main():
