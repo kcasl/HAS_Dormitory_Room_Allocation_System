@@ -59,14 +59,14 @@ class DormitoryAllocationGUI:
         
         title_label = ttk.Label(
             title_frame, 
-            text="🏠 기숙사 방 배정 시스템", 
+            text="🏠 하나고등학교 기숙사 방 배정 시스템",
             font=(DEFAULT_FONT[0], 20, "bold")
         )
         title_label.pack()
         
         subtitle_label = ttk.Label(
             title_frame,
-            text="Excel 파일을 업로드하여 자동으로 방을 배정합니다",
+            text="Excel 파일(xlsx)을 업로드하여 자동으로 방을 배정합니다",
             font=(DEFAULT_FONT_SMALL[0], 10)
         )
         subtitle_label.pack(pady=(5, 0))
