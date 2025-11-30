@@ -37,7 +37,7 @@ class DormitoryAllocationGUI:
         
         # 파일 선택 섹션
         file_frame = ttk.LabelFrame(main_frame, text="Excel 파일 선택", padding="10")
-        file_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        file_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
         file_frame.columnconfigure(1, weight=1)
         
         ttk.Label(file_frame, text="파일 경로:").grid(row=0, column=0, padx=(0, 10), sticky=tk.W)
@@ -47,7 +47,7 @@ class DormitoryAllocationGUI:
             file_frame, 
             textvariable=self.file_path_var, 
             foreground="gray",
-            wraplength=500
+            wraplength=400
         )
         file_path_label.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
         
@@ -65,7 +65,7 @@ class DormitoryAllocationGUI:
             command=self.run_allocation,
             state="disabled"
         )
-        run_button.grid(row=1, column=2, padx=(10, 0), sticky=tk.E)
+        run_button.grid(row=1, column=2, padx=(10, 0), sticky=(tk.W, tk.E))
         self.run_button = run_button
         
         # 결과 표시 섹션
