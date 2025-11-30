@@ -1,4 +1,4 @@
 # Ignore only the data.xlsx file inside src/
-src/data.xlsx
+data.xlsx
 
 *.xlsx
