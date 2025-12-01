@@ -25,14 +25,23 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None)
         # 정렬하여 양방향 체크 가능하도록
         sorted_pair = tuple(sorted(pair))
         blacklist_set.add(sorted_pair)
-    std_id = [i for i in range(100)]
+    
+    # 엑셀 파일 읽기
+    df = pd.read_excel(excel_file_path)
+    
+    # "학번" 컬럼에서 학생 ID 리스트 읽기
+    std_id = df["학번"].dropna().tolist()
+    std_id = [int(x) for x in std_id if pd.notna(x)]
     rd.shuffle(std_id)
 
-    room_id = []
-    for _ in range(25):
-        room_id.append({"seat1": "", "seat2": "", "seat3": "", "seat4": ""})
+    # 방 개수 계산: len(std_id)/4 (나머지가 있으면 +1)
+    num_rooms = len(std_id) // 4
+    if len(std_id) % 4 != 0:
+        num_rooms += 1
 
-    df = pd.read_excel(excel_file_path)
+    room_id = []
+    for _ in range(num_rooms):
+        room_id.append({"seat1": "", "seat2": "", "seat3": "", "seat4": ""})
 
     # 유사도 계산에 사용할 factor 컬럼 확인
     similarity_features = []
@@ -45,10 +54,18 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None)
     hallway_seats = ["seat1", "seat4"]  # 1,4번
     window_seats = ["seat2", "seat3"]  # 2,3번
 
-    for i in range(25):
-        student = std_id[i] + 1
+    for i in range(min(num_rooms, len(std_id))):
+        student = std_id[i]
 
-        prev_loc = df.loc[df["StudentID"] == student, "Prevloc"].values[0]
+        prev_loc_row = df.loc[df["학번"] == student, "현재 좌석 번호"]
+        if prev_loc_row.empty:
+            prev_loc = 0
+        else:
+            prev_loc = prev_loc_row.values[0]
+            if pd.isna(prev_loc):
+                prev_loc = 0
+            else:
+                prev_loc = int(prev_loc)
 
         # 이전에 복도(1,4) 라면 이번엔 창가(2,3)
         if prev_loc in [1, 4]:
@@ -82,12 +99,12 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None)
                 assigned.add(seat)
 
     # 아직 배정 안된넘들
-    remaining = [s+1 for s in std_id if (s+1) not in assigned]
+    remaining = [s for s in std_id if s not in assigned]
 
     # 좌석 순서
     seat_order = ["seat1", "seat2", "seat3", "seat4"]
 
-    for room_idx in range(25):
+    for room_idx in range(num_rooms):
         room = room_id[room_idx]
 
         # 현재 방에 있는 사람
@@ -105,13 +122,13 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None)
             
             # 배정 가능 여부 췤
             for student in remaining:
-                row = df.loc[df["StudentID"] == student]
+                row = df.loc[df["학번"] == student]
                 if row.empty:
                     continue
 
-                # Prev1~Prev3, Avoid1~Avoid2 데이터 읽기
-                prev_list = row[["Prev1", "Prev2", "Prev3"]].values[0]
-                avoid_list = row[["Avoid1", "Avoid2"]].values[0]
+                # 현재 룸메이트 1~3, 배려 학생 1~2 데이터 읽기
+                prev_list = row[["현재 룸메이트 1", "현재 룸메이트 2", "현재 룸메이트 3"]].values[0]
+                avoid_list = row[["배려 학생 1", "배려 학생 2"]].values[0]
 
                 # NaN/빈칸 제거
                 prev_list = [int(x) for x in prev_list if not (pd.isna(x) or x == "" or x == 0)]
