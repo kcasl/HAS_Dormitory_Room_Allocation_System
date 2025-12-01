@@ -37,6 +37,7 @@ class DormitoryAllocationGUI:
         # 배정 결과 저장 (나중에 엑셀로 저장하기 위해)
         self.current_room_id = None
         self.current_failed_students = None
+        self.student_name_map = {}  # 학번-이름 매핑 딕셔너리
 
         # Factor 체크박스 변수들
         self.factor_vars = {}
@@ -598,6 +599,14 @@ class DormitoryAllocationGUI:
                 selected_factors if selected_factors else None
             )
 
+            # 엑셀 파일에서 학번-이름 매핑 생성
+            df = pd.read_excel(self.selected_file)
+            if "이름" in df.columns:
+                self.student_name_map = dict(zip(df["학번"], df["이름"]))
+            else:
+                # "이름" 컬럼이 없으면 학번만 사용
+                self.student_name_map = {sid: str(sid) for sid in df["학번"].dropna()}
+
             # 배정 결과 저장 (엑셀 저장용)
             self.current_room_id = room_id
             self.current_failed_students = failed_students
@@ -636,7 +645,12 @@ class DormitoryAllocationGUI:
                 student_id = room[seat_name]
                 seat_num = seat_name.replace("seat", "")
                 if student_id:
-                    seats_info.append(f"좌석{seat_num}: 학생{student_id:3d}")
+                    # 학번-이름 형식으로 출력
+                    student_name = self.student_name_map.get(student_id, str(student_id))
+                    if student_name != str(student_id):
+                        seats_info.append(f"좌석{seat_num}: {student_id}-{student_name}")
+                    else:
+                        seats_info.append(f"좌석{seat_num}: {student_id}")
                 else:
                     seats_info.append(f"좌석{seat_num}: 빈자리  ")
 
@@ -690,15 +704,32 @@ class DormitoryAllocationGUI:
             self.status_var.set("엑셀 파일 저장 중...")
             self.root.update()
 
-            # 배정 결과를 DataFrame으로 변환
+            # 배정 결과를 DataFrame으로 변환 (학번과 이름을 별도로 저장)
             room_data = []
             for i, room in enumerate(self.current_room_id, start=1):
+                # 각 좌석에 대해 학번과 이름을 별도로 저장
+                def get_student_info(seat_value):
+                    if seat_value:
+                        student_id = seat_value
+                        student_name = self.student_name_map.get(student_id, "")
+                        return student_id, student_name if student_name else ""
+                    return "", ""
+                
+                seat1_id, seat1_name = get_student_info(room["seat1"])
+                seat2_id, seat2_name = get_student_info(room["seat2"])
+                seat3_id, seat3_name = get_student_info(room["seat3"])
+                seat4_id, seat4_name = get_student_info(room["seat4"])
+                
                 room_data.append({
                     "방 번호": i,
-                    "좌석1": room["seat1"] if room["seat1"] else "",
-                    "좌석2": room["seat2"] if room["seat2"] else "",
-                    "좌석3": room["seat3"] if room["seat3"] else "",
-                    "좌석4": room["seat4"] if room["seat4"] else ""
+                    "좌석1_학번": seat1_id if seat1_id else "",
+                    "좌석1_이름": seat1_name,
+                    "좌석2_학번": seat2_id if seat2_id else "",
+                    "좌석2_이름": seat2_name,
+                    "좌석3_학번": seat3_id if seat3_id else "",
+                    "좌석3_이름": seat3_name,
+                    "좌석4_학번": seat4_id if seat4_id else "",
+                    "좌석4_이름": seat4_name
                 })
 
             df_rooms = pd.DataFrame(room_data)
