@@ -209,10 +209,10 @@ class DormitoryAllocationGUI:
         )
         self.run_button.pack()
 
-        # 블랙리스트 관리 섹션
+        #  관리 섹션
         blacklist_frame = ttk.LabelFrame(
             self.main_frame,
-            text=" 🚫 블랙리스트 조합 관리 ",
+            text=" 🚫 배려 학생 조합 관리 ",
             padding="20"
         )
         blacklist_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 25))
