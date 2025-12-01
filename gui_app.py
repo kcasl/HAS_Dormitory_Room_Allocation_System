@@ -425,38 +425,73 @@ class DormitoryAllocationGUI:
             self.status_var.set(f"✓ 파일 선택됨: {filename} - Factor를 선택하고 배정 실행 버튼을 클릭하세요")
 
     def detect_and_create_factor_checkboxes(self, file_path):
-        """엑셀 파일에서 factor 컬럼들을 감지하고 체크박스 생성"""
+        """엑셀 파일에서 factor 컬럼들을 감지하고 체크박스 생성
+        '현재 룸메이트 3' 컬럼 이후의 모든 컬럼 중에서
+        실수 또는 정수형 데이터를 가진 컬럼을 factor로 인식"""
         try:
             # 기존 체크박스 제거
             for widget in self.factor_checkbox_frame.winfo_children():
                 widget.destroy()
             self.factor_vars.clear()
             self.available_factors.clear()
-
-            # 엑셀 파일 읽기
-            df = pd.read_excel(file_path, nrows=1)  # 헤더만 읽기
-
-            # factor1, factor2, ... 패턴으로 컬럼 찾기
-            import re
-            factor_pattern = re.compile(r'^factor\d+$', re.IGNORECASE)
-
-            for col in df.columns:
-                if factor_pattern.match(str(col)):
-                    self.available_factors.append(col)
-
-            # factor 컬럼들을 정렬 (factor1, factor2, ... 순서)
-            self.available_factors.sort(key=lambda x: int(re.search(r'\d+', x).group()))
-
+            
+            # 엑셀 파일 읽기 (데이터 타입 확인을 위해 여러 행 읽기)
+            df = pd.read_excel(file_path)
+            
+            # "현재 룸메이트 3" 컬럼의 인덱스 찾기
+            target_column = "현재 룸메이트 3"
+            if target_column not in df.columns:
+                # "현재 룸메이트 3" 컬럼이 없으면 안내 메시지
+                no_column_label = ttk.Label(
+                    self.factor_checkbox_frame,
+                    text=f"'{target_column}' 컬럼을 찾을 수 없습니다.",
+                    font=(DEFAULT_FONT_SMALL[0], 9),
+                    foreground="gray"
+                )
+                no_column_label.grid(row=0, column=0, sticky=tk.W)
+                return
+            
+            # "현재 룸메이트 3" 컬럼의 인덱스 찾기
+            target_idx = df.columns.get_loc(target_column)
+            
+            # "현재 룸메이트 3" 이후의 모든 컬럼 확인
+            for col_idx in range(target_idx + 1, len(df.columns)):
+                col_name = df.columns[col_idx]
+                
+                # 해당 컬럼의 데이터 타입 확인
+                col_data = df[col_name].dropna()
+                
+                if len(col_data) == 0:
+                    continue  # 데이터가 없으면 스킵
+                
+                # pandas의 숫자형 타입인지 확인
+                is_numeric = pd.api.types.is_numeric_dtype(df[col_name])
+                
+                # 숫자형이 아니더라도 모든 값이 실수 또는 정수로 변환 가능한지 확인
+                if not is_numeric:
+                    is_numeric = True
+                    for value in col_data:
+                        try:
+                            # 실수 또는 정수로 변환 가능한지 확인
+                            float(value)
+                        except (ValueError, TypeError):
+                            is_numeric = False
+                            break
+                
+                # 실수 또는 정수형 데이터인 경우 factor로 추가
+                if is_numeric:
+                    self.available_factors.append(col_name)
+            
             if self.available_factors:
                 # 체크박스 생성 (3열로 배치)
                 cols_per_row = 3
                 for idx, factor in enumerate(self.available_factors):
                     row = idx // cols_per_row
                     col = idx % cols_per_row
-
+                    
                     var = tk.BooleanVar(value=True)  # 기본적으로 모두 체크
                     self.factor_vars[factor] = var
-
+                    
                     checkbox = ttk.Checkbutton(
                         self.factor_checkbox_frame,
                         text=factor,
@@ -467,12 +502,12 @@ class DormitoryAllocationGUI:
                 # Factor가 없으면 안내 메시지
                 no_factor_label = ttk.Label(
                     self.factor_checkbox_frame,
-                    text="이 파일에는 factor 컬럼이 없습니다. (factor1, factor2, ... 형식)",
+                    text="'현재 룸메이트 3' 이후에 숫자형 데이터를 가진 컬럼이 없습니다.",
                     font=(DEFAULT_FONT_SMALL[0], 9),
                     foreground="gray"
                 )
                 no_factor_label.grid(row=0, column=0, sticky=tk.W)
-
+                
         except Exception as e:
             # 오류 발생 시 메시지 표시
             error_label = ttk.Label(
