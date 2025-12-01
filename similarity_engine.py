@@ -61,13 +61,13 @@ def get_student_features(df, student_id, feature_columns):
     
     Args:
         df: 데이터프레임
-        student_id: 학생 ID
+        student_id: 학생 ID (학번)
         feature_columns: 특성 컬럼 이름 리스트
         
     Returns:
         list: 특성 벡터
     """
-    row = df.loc[df["StudentID"] == student_id]
+    row = df.loc[df["학번"] == student_id]
     if row.empty:
         return [3.0] * len(feature_columns)  # 기본값 반환 (1~5 척도의 중간값)
     

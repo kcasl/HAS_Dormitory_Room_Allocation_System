@@ -37,6 +37,7 @@ class DormitoryAllocationGUI:
         # 배정 결과 저장 (나중에 엑셀로 저장하기 위해)
         self.current_room_id = None
         self.current_failed_students = None
+        self.student_name_map = {}  # 학번-이름 매핑 딕셔너리
 
         # Factor 체크박스 변수들
         self.factor_vars = {}
@@ -425,38 +426,73 @@ class DormitoryAllocationGUI:
             self.status_var.set(f"✓ 파일 선택됨: {filename} - Factor를 선택하고 배정 실행 버튼을 클릭하세요")
 
     def detect_and_create_factor_checkboxes(self, file_path):
-        """엑셀 파일에서 factor 컬럼들을 감지하고 체크박스 생성"""
+        """엑셀 파일에서 factor 컬럼들을 감지하고 체크박스 생성
+        '현재 룸메이트 3' 컬럼 이후의 모든 컬럼 중에서
+        실수 또는 정수형 데이터를 가진 컬럼을 factor로 인식"""
         try:
             # 기존 체크박스 제거
             for widget in self.factor_checkbox_frame.winfo_children():
                 widget.destroy()
             self.factor_vars.clear()
             self.available_factors.clear()
-
-            # 엑셀 파일 읽기
-            df = pd.read_excel(file_path, nrows=1)  # 헤더만 읽기
-
-            # factor1, factor2, ... 패턴으로 컬럼 찾기
-            import re
-            factor_pattern = re.compile(r'^factor\d+$', re.IGNORECASE)
-
-            for col in df.columns:
-                if factor_pattern.match(str(col)):
-                    self.available_factors.append(col)
-
-            # factor 컬럼들을 정렬 (factor1, factor2, ... 순서)
-            self.available_factors.sort(key=lambda x: int(re.search(r'\d+', x).group()))
-
+            
+            # 엑셀 파일 읽기 (데이터 타입 확인을 위해 여러 행 읽기)
+            df = pd.read_excel(file_path)
+            
+            # "현재 룸메이트 3" 컬럼의 인덱스 찾기
+            target_column = "현재 룸메이트 3"
+            if target_column not in df.columns:
+                # "현재 룸메이트 3" 컬럼이 없으면 안내 메시지
+                no_column_label = ttk.Label(
+                    self.factor_checkbox_frame,
+                    text=f"'{target_column}' 컬럼을 찾을 수 없습니다.",
+                    font=(DEFAULT_FONT_SMALL[0], 9),
+                    foreground="gray"
+                )
+                no_column_label.grid(row=0, column=0, sticky=tk.W)
+                return
+            
+            # "현재 룸메이트 3" 컬럼의 인덱스 찾기
+            target_idx = df.columns.get_loc(target_column)
+            
+            # "현재 룸메이트 3" 이후의 모든 컬럼 확인
+            for col_idx in range(target_idx + 1, len(df.columns)):
+                col_name = df.columns[col_idx]
+                
+                # 해당 컬럼의 데이터 타입 확인
+                col_data = df[col_name].dropna()
+                
+                if len(col_data) == 0:
+                    continue  # 데이터가 없으면 스킵
+                
+                # pandas의 숫자형 타입인지 확인
+                is_numeric = pd.api.types.is_numeric_dtype(df[col_name])
+                
+                # 숫자형이 아니더라도 모든 값이 실수 또는 정수로 변환 가능한지 확인
+                if not is_numeric:
+                    is_numeric = True
+                    for value in col_data:
+                        try:
+                            # 실수 또는 정수로 변환 가능한지 확인
+                            float(value)
+                        except (ValueError, TypeError):
+                            is_numeric = False
+                            break
+                
+                # 실수 또는 정수형 데이터인 경우 factor로 추가
+                if is_numeric:
+                    self.available_factors.append(col_name)
+            
             if self.available_factors:
                 # 체크박스 생성 (3열로 배치)
                 cols_per_row = 3
                 for idx, factor in enumerate(self.available_factors):
                     row = idx // cols_per_row
                     col = idx % cols_per_row
-
+                    
                     var = tk.BooleanVar(value=True)  # 기본적으로 모두 체크
                     self.factor_vars[factor] = var
-
+                    
                     checkbox = ttk.Checkbutton(
                         self.factor_checkbox_frame,
                         text=factor,
@@ -467,12 +503,12 @@ class DormitoryAllocationGUI:
                 # Factor가 없으면 안내 메시지
                 no_factor_label = ttk.Label(
                     self.factor_checkbox_frame,
-                    text="이 파일에는 factor 컬럼이 없습니다. (factor1, factor2, ... 형식)",
+                    text="'현재 룸메이트 3' 이후에 숫자형 데이터를 가진 컬럼이 없습니다.",
                     font=(DEFAULT_FONT_SMALL[0], 9),
                     foreground="gray"
                 )
                 no_factor_label.grid(row=0, column=0, sticky=tk.W)
-
+                
         except Exception as e:
             # 오류 발생 시 메시지 표시
             error_label = ttk.Label(
@@ -563,6 +599,14 @@ class DormitoryAllocationGUI:
                 selected_factors if selected_factors else None
             )
 
+            # 엑셀 파일에서 학번-이름 매핑 생성
+            df = pd.read_excel(self.selected_file)
+            if "이름" in df.columns:
+                self.student_name_map = dict(zip(df["학번"], df["이름"]))
+            else:
+                # "이름" 컬럼이 없으면 학번만 사용
+                self.student_name_map = {sid: str(sid) for sid in df["학번"].dropna()}
+
             # 배정 결과 저장 (엑셀 저장용)
             self.current_room_id = room_id
             self.current_failed_students = failed_students
@@ -601,7 +645,12 @@ class DormitoryAllocationGUI:
                 student_id = room[seat_name]
                 seat_num = seat_name.replace("seat", "")
                 if student_id:
-                    seats_info.append(f"좌석{seat_num}: 학생{student_id:3d}")
+                    # 학번-이름 형식으로 출력
+                    student_name = self.student_name_map.get(student_id, str(student_id))
+                    if student_name != str(student_id):
+                        seats_info.append(f"좌석{seat_num}: {student_id}-{student_name}")
+                    else:
+                        seats_info.append(f"좌석{seat_num}: {student_id}")
                 else:
                     seats_info.append(f"좌석{seat_num}: 빈자리  ")
 
@@ -655,15 +704,32 @@ class DormitoryAllocationGUI:
             self.status_var.set("엑셀 파일 저장 중...")
             self.root.update()
 
-            # 배정 결과를 DataFrame으로 변환
+            # 배정 결과를 DataFrame으로 변환 (학번과 이름을 별도로 저장)
             room_data = []
             for i, room in enumerate(self.current_room_id, start=1):
+                # 각 좌석에 대해 학번과 이름을 별도로 저장
+                def get_student_info(seat_value):
+                    if seat_value:
+                        student_id = seat_value
+                        student_name = self.student_name_map.get(student_id, "")
+                        return student_id, student_name if student_name else ""
+                    return "", ""
+                
+                seat1_id, seat1_name = get_student_info(room["seat1"])
+                seat2_id, seat2_name = get_student_info(room["seat2"])
+                seat3_id, seat3_name = get_student_info(room["seat3"])
+                seat4_id, seat4_name = get_student_info(room["seat4"])
+                
                 room_data.append({
                     "방 번호": i,
-                    "좌석1": room["seat1"] if room["seat1"] else "",
-                    "좌석2": room["seat2"] if room["seat2"] else "",
-                    "좌석3": room["seat3"] if room["seat3"] else "",
-                    "좌석4": room["seat4"] if room["seat4"] else ""
+                    "좌석1_학번": seat1_id if seat1_id else "",
+                    "좌석1_이름": seat1_name,
+                    "좌석2_학번": seat2_id if seat2_id else "",
+                    "좌석2_이름": seat2_name,
+                    "좌석3_학번": seat3_id if seat3_id else "",
+                    "좌석3_이름": seat3_name,
+                    "좌석4_학번": seat4_id if seat4_id else "",
+                    "좌석4_이름": seat4_name
                 })
 
             df_rooms = pd.DataFrame(room_data)
