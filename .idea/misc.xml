@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.10 (HAS_Domitory)" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.12 (HAS_Dormitory_Room_Allocation_System)" project-jdk-type="Python SDK" />
 </project>
