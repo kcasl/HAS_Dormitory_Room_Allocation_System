@@ -73,3 +73,4 @@ python create_test_data.py
 - 일부 특성만 있어도 해당 특성만으로 유사도 계산
 - NaN 값은 기본값(5.0)으로 처리됩니다
 
+

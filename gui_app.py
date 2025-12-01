@@ -15,11 +15,12 @@ else:
     DEFAULT_FONT_SMALL = ("맑은 고딕",)
 
 
+
 class DormitoryAllocationGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("기숙사 방 배정 시스템")
-        self.root.geometry("1100x850")
+        self.root.geometry("1200x900")
         self.root.resizable(True, True)
         
         # 배경색 설정 (윈도우 호환)
@@ -53,19 +54,19 @@ class DormitoryAllocationGUI:
         except:
             pass  # 스타일 설정 실패 시 무시
         
-        # 메인 프레임
-        main_frame = ttk.Frame(self.root, padding="20")
+        # 메인 프레임 (더 넉넉한 패딩)
+        main_frame = ttk.Frame(self.root, padding="30")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 그리드 가중치 설정
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(4, weight=1)
+        main_frame.rowconfigure(5, weight=1)
         
-        # 제목 영역
+        # 제목 영역 (더 넉넉한 간격)
         title_frame = ttk.Frame(main_frame)
-        title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 30))
+        title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 40))
         
         title_label = ttk.Label(
             title_frame, 
@@ -86,25 +87,25 @@ class DormitoryAllocationGUI:
         except:
             pass
         
-        # 파일 선택 및 실행 섹션
+        # 파일 선택 및 실행 섹션 (더 넉넉한 패딩)
         control_frame = ttk.LabelFrame(
             main_frame, 
             text=" 파일 선택 및 실행 ", 
-            padding="20"
+            padding="25"
         )
-        control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 25))
         control_frame.columnconfigure(1, weight=1)
         
-        # 파일 선택 영역
+        # 파일 선택 영역 (더 넉넉한 간격)
         file_select_frame = ttk.Frame(control_frame)
-        file_select_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        file_select_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         file_select_frame.columnconfigure(1, weight=1)
         
         ttk.Label(
             file_select_frame, 
             text="Excel 파일:", 
             font=(DEFAULT_FONT[0], 11)
-        ).grid(row=0, column=0, padx=(0, 15), sticky=tk.W)
+        ).grid(row=0, column=0, padx=(0, 20), sticky=tk.W)
         
         self.file_path_var = tk.StringVar(value="파일을 선택해주세요")
         file_path_entry = ttk.Entry(
@@ -112,73 +113,73 @@ class DormitoryAllocationGUI:
             textvariable=self.file_path_var,
             state="readonly",
             font=(DEFAULT_FONT_SMALL[0], 10),
-            width=50
+            width=55
         )
-        file_path_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        file_path_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 15))
         
         browse_button = ttk.Button(
             file_select_frame, 
             text="📁 파일 선택", 
             command=self.browse_file,
-            width=15
+            width=18
         )
         browse_button.grid(row=0, column=2)
         
-        # 실행 버튼 영역 (중앙 정렬)
+        # 실행 버튼 영역 (중앙 정렬, 더 넉넉한 간격)
         button_frame = ttk.Frame(control_frame)
-        button_frame.grid(row=1, column=0, columnspan=3, pady=(5, 0))
+        button_frame.grid(row=1, column=0, columnspan=3, pady=(15, 0))
         
         self.run_button = ttk.Button(
             button_frame,
             text="▶ 배정 실행",
             command=self.run_allocation,
             state="disabled",
-            width=20
+            width=25
         )
         self.run_button.pack()
         
-        # 블랙리스트 관리 섹션
+        # 블랙리스트 관리 섹션 (더 넉넉한 패딩)
         blacklist_frame = ttk.LabelFrame(
             main_frame,
             text=" 🚫 블랙리스트 조합 관리 ",
-            padding="15"
+            padding="20"
         )
-        blacklist_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        blacklist_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 25))
         blacklist_frame.columnconfigure(1, weight=1)
         
-        # 설명
+        # 설명 (더 넉넉한 간격)
         desc_label = ttk.Label(
             blacklist_frame,
             text="같은 방에 배정되지 않아야 하는 학생 조합을 추가하세요 (예: 학생1과 학생2)",
             font=(DEFAULT_FONT_SMALL[0], 9)
         )
-        desc_label.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 10))
+        desc_label.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 15))
         try:
             desc_label.configure(style="Desc.TLabel")
         except:
             pass
         
-        # 입력 영역
+        # 입력 영역 (더 넉넉한 간격)
         input_frame = ttk.Frame(blacklist_frame)
-        input_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 10))
+        input_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 15))
         input_frame.columnconfigure(1, weight=1)
         input_frame.columnconfigure(3, weight=1)
         
-        ttk.Label(input_frame, text="학생 ID 1:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=0, padx=(0, 5))
+        ttk.Label(input_frame, text="학생 ID 1:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=0, padx=(0, 10))
         self.blacklist_student1_var = tk.StringVar()
-        student1_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student1_var, width=10, font=(DEFAULT_FONT_SMALL[0], 10))
-        student1_entry.grid(row=0, column=1, padx=(0, 15))
+        student1_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student1_var, width=12, font=(DEFAULT_FONT_SMALL[0], 10))
+        student1_entry.grid(row=0, column=1, padx=(0, 20))
         
-        ttk.Label(input_frame, text="학생 ID 2:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=2, padx=(0, 5))
+        ttk.Label(input_frame, text="학생 ID 2:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=2, padx=(0, 10))
         self.blacklist_student2_var = tk.StringVar()
-        student2_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student2_var, width=10, font=(DEFAULT_FONT_SMALL[0], 10))
-        student2_entry.grid(row=0, column=3, padx=(0, 10))
+        student2_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student2_var, width=12, font=(DEFAULT_FONT_SMALL[0], 10))
+        student2_entry.grid(row=0, column=3, padx=(0, 15))
         
         add_blacklist_button = ttk.Button(
             input_frame,
             text="추가",
             command=self.add_blacklist_pair,
-            width=10
+            width=12
         )
         add_blacklist_button.grid(row=0, column=4)
         
@@ -206,31 +207,31 @@ class DormitoryAllocationGUI:
         self.blacklist_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         scrollbar.config(command=self.blacklist_listbox.yview)
         
-        # 삭제 버튼
+        # 삭제 버튼 (더 넉넉한 간격)
         delete_button = ttk.Button(
             list_frame,
             text="선택 항목 삭제",
             command=self.remove_blacklist_pair,
-            width=15
+            width=18
         )
-        delete_button.grid(row=1, column=0, pady=(10, 0))
+        delete_button.grid(row=1, column=0, pady=(15, 0))
         
-        # Factor 선택 섹션
+        # Factor 선택 섹션 (더 넉넉한 패딩)
         factor_frame = ttk.LabelFrame(
             main_frame,
             text=" 📊 Factor 선택 (유사도 기반 배정) ",
-            padding="15"
+            padding="20"
         )
-        factor_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        factor_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(0, 25))
         factor_frame.columnconfigure(0, weight=1)
         
-        # Factor 설명
+        # Factor 설명 (더 넉넉한 간격)
         factor_desc_label = ttk.Label(
             factor_frame,
             text="파일을 선택하면 사용 가능한 factor들이 표시됩니다. 체크한 factor들로 유사한 학생들끼리 배정됩니다.",
             font=(DEFAULT_FONT_SMALL[0], 9)
         )
-        factor_desc_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
+        factor_desc_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 15))
         try:
             factor_desc_label.configure(style="Desc.TLabel")
         except:
@@ -242,19 +243,19 @@ class DormitoryAllocationGUI:
         
         # Factor 체크박스는 파일 선택 후 동적으로 생성됨
         
-        # 결과 표시 섹션
+        # 결과 표시 섹션 (더 넉넉한 패딩)
         result_frame = ttk.LabelFrame(
             main_frame, 
             text=" 배정 결과 ", 
-            padding="15"
+            padding="20"
         )
         result_frame.grid(row=4, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(1, weight=1)
         
-        # 저장 버튼 영역 (더 눈에 띄게)
+        # 저장 버튼 영역 (더 넉넉한 간격)
         save_button_frame = ttk.Frame(result_frame)
-        save_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        save_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
         save_button_frame.columnconfigure(0, weight=1)
         
         # 저장 버튼을 중앙에 배치하고 더 크게
@@ -274,8 +275,8 @@ class DormitoryAllocationGUI:
         notebook = ttk.Notebook(result_frame)
         notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # 탭 1: 방 배정 결과
-        room_frame = ttk.Frame(notebook, padding="15")
+        # 탭 1: 방 배정 결과 (더 넉넉한 패딩)
+        room_frame = ttk.Frame(notebook, padding="20")
         notebook.add(room_frame, text="📋 방 배정 결과")
         room_frame.columnconfigure(0, weight=1)
         room_frame.rowconfigure(0, weight=1)
@@ -284,8 +285,8 @@ class DormitoryAllocationGUI:
         self.room_text = scrolledtext.ScrolledText(
             room_frame, 
             wrap=tk.WORD, 
-            width=90, 
-            height=30,
+            width=95, 
+            height=32,
             font=(DEFAULT_FONT_SMALL[0], 10),
             relief=tk.FLAT,
             borderwidth=1
@@ -296,8 +297,8 @@ class DormitoryAllocationGUI:
             pass
         self.room_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # 탭 2: 실패 목록
-        failed_frame = ttk.Frame(notebook, padding="15")
+        # 탭 2: 실패 목록 (더 넉넉한 패딩)
+        failed_frame = ttk.Frame(notebook, padding="20")
         notebook.add(failed_frame, text="⚠ 배정 실패 목록")
         failed_frame.columnconfigure(0, weight=1)
         failed_frame.rowconfigure(0, weight=1)
@@ -305,8 +306,8 @@ class DormitoryAllocationGUI:
         self.failed_text = scrolledtext.ScrolledText(
             failed_frame, 
             wrap=tk.WORD, 
-            width=90, 
-            height=30,
+            width=95, 
+            height=32,
             font=(DEFAULT_FONT_SMALL[0], 10),
             relief=tk.FLAT,
             borderwidth=1
@@ -321,9 +322,9 @@ class DormitoryAllocationGUI:
                 pass
         self.failed_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # 상태바
+        # 상태바 (더 넉넉한 간격)
         status_frame = ttk.Frame(main_frame)
-        status_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(15, 0))
+        status_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(20, 0))
         
         self.status_var = tk.StringVar(value="준비됨 - 파일을 선택해주세요")
         status_bar = ttk.Label(
@@ -331,7 +332,7 @@ class DormitoryAllocationGUI:
             textvariable=self.status_var, 
             relief=tk.SUNKEN,
             anchor=tk.W,
-            padding="8",
+            padding="10",
             font=(DEFAULT_FONT_SMALL[0], 9)
         )
         status_bar.pack(fill=tk.X)
@@ -395,7 +396,7 @@ class DormitoryAllocationGUI:
                         text=factor,
                         variable=var
                     )
-                    checkbox.grid(row=row, column=col, sticky=tk.W, padx=10, pady=5)
+                    checkbox.grid(row=row, column=col, sticky=tk.W, padx=15, pady=8)
             else:
                 # Factor가 없으면 안내 메시지
                 no_factor_label = ttk.Label(
