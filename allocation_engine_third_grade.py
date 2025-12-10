@@ -34,6 +34,15 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None)
     std_id = [int(x) for x in std_id if pd.notna(x)]
     rd.shuffle(std_id)
 
+    # ----- 배려 학생 컬럼 동적 감지 -----
+    # 예: "배려 학생 1", "배려 학생 2", ..., "배려 학생 5"
+    # 또는 사용자가 공백 없이 "배려학생1" 등으로 입력한 경우도 허용
+    avoid_columns = []
+    for col in df.columns:
+        normalized = str(col).replace(" ", "")
+        if normalized.startswith("배려학생"):
+            avoid_columns.append(col)
+
     # 방 개수 계산: len(std_id)/4 (나머지가 있으면 +1)
     num_rooms = len(std_id) // 4
     if len(std_id) % 4 != 0:
@@ -119,13 +128,26 @@ def allocate_rooms(excel_file_path, blacklist_pairs=None, selected_factors=None)
                 if row.empty:
                     continue
 
-                # 현재 룸메이트 1~3, 배려 학생 1~2 데이터 읽기
-                prev_list = row[["현재 룸메이트 1", "현재 룸메이트 2", "현재 룸메이트 3"]].values[0]
-                avoid_list = row[["배려 학생 1", "배려 학생 2"]].values[0]
+                # 현재 룸메이트 1~3 데이터 읽기
+                prev_list_raw = row[["현재 룸메이트 1", "현재 룸메이트 2", "현재 룸메이트 3"]].values[0]
 
-                # NaN/빈칸 제거
-                prev_list = [int(x) for x in prev_list if not (pd.isna(x) or x == "" or x == 0)]
-                avoid_list = [int(x) for x in avoid_list if not (pd.isna(x) or x == "" or x == 0)]
+                # 배려 학생 1~5(또는 더 많은) 컬럼들을 모두 사용
+                if avoid_columns:
+                    avoid_list_raw = row[avoid_columns].values[0]
+                else:
+                    avoid_list_raw = []
+
+                # NaN/빈칸 제거 및 정수 변환
+                prev_list = [
+                    int(x)
+                    for x in prev_list_raw
+                    if not (pd.isna(x) or x == "" or x == 0)
+                ]
+                avoid_list = [
+                    int(x)
+                    for x in np.atleast_1d(avoid_list_raw)
+                    if not (pd.isna(x) or x == "" or x == 0)
+                ]
 
                 # 조건
 

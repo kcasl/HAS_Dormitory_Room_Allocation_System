@@ -18,7 +18,7 @@ else:
 class DormitoryAllocationGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("기숙사 방 배정 시스템")
+        self.root.title("생활관 호실 배정 프로그램")
         self.root.geometry("1200x900")
         self.root.resizable(True, True)
 
@@ -143,7 +143,7 @@ class DormitoryAllocationGUI:
 
         title_label = ttk.Label(
             title_frame,
-            text="🏠 하나고등학교 기숙사 방 배정 시스템",
+            text="🏠 하나고등학교 생활관 호실 배정 프로그램",
             font=(DEFAULT_FONT[0], 20, "bold")
         )
         title_label.pack()

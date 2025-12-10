@@ -18,7 +18,7 @@ else:
 class DormitoryAllocationGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("기숙사 방 배정 시스템 (3학년용)")
+        self.root.title("생활관 호실 배정 프로그램 (3학년용)")
         self.root.geometry("1200x900")
         self.root.resizable(True, True)
         
@@ -33,6 +33,8 @@ class DormitoryAllocationGUI:
         
         # 블랙리스트 조합 저장 (튜플의 리스트)
         self.blacklist_pairs = []
+        # 한 학생에 여러 명을 배려 대상으로 추가하기 위한 임시 저장
+        self.blacklist_group_targets = []
         
         # 배정 결과 저장 (나중에 엑셀로 저장하기 위해)
         self.current_room_id = None
@@ -143,7 +145,7 @@ class DormitoryAllocationGUI:
         
         title_label = ttk.Label(
             title_frame,
-            text="🏠 기숙사 방 배정 시스템 (3학년용)",
+            text="🏠 생활관 호실 배정 프로그램(3학년용)",
             font=(DEFAULT_FONT[0], 20, "bold")
         )
         title_label.pack()
@@ -213,7 +215,7 @@ class DormitoryAllocationGUI:
         # 블랙리스트 관리 섹션
         blacklist_frame = ttk.LabelFrame(
             self.main_frame,
-            text=" 🚫 블랙리스트 조합 관리 ",
+            text="배려 학생 조합 관리 ",
             padding="20"
         )
         blacklist_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 25))
@@ -237,23 +239,41 @@ class DormitoryAllocationGUI:
         input_frame.columnconfigure(1, weight=1)
         input_frame.columnconfigure(3, weight=1)
         
-        ttk.Label(input_frame, text="학생 ID 1:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=0, padx=(0, 10))
+        ttk.Label(input_frame, text="학생 고유학번 1:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=0, padx=(0, 10))
         self.blacklist_student1_var = tk.StringVar()
         student1_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student1_var, width=12, font=(DEFAULT_FONT_SMALL[0], 10))
         student1_entry.grid(row=0, column=1, padx=(0, 20))
         
-        ttk.Label(input_frame, text="학생 ID 2:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=2, padx=(0, 10))
+        ttk.Label(input_frame, text="학생 고유학번 2:", font=(DEFAULT_FONT_SMALL[0], 10)).grid(row=0, column=2, padx=(0, 10))
         self.blacklist_student2_var = tk.StringVar()
         student2_entry = ttk.Entry(input_frame, textvariable=self.blacklist_student2_var, width=12, font=(DEFAULT_FONT_SMALL[0], 10))
         student2_entry.grid(row=0, column=3, padx=(0, 15))
+        
+        # 한 학생에 여러 명을 한 번에 추가하기 위한 + 버튼
+        plus_button = ttk.Button(
+            input_frame,
+            text="+",
+            command=self.add_blacklist_target,
+            width=3
+        )
+        plus_button.grid(row=0, column=4, padx=(0, 5))
         
         add_blacklist_button = ttk.Button(
             input_frame,
             text="추가",
             command=self.add_blacklist_pair,
-            width=12
+            width=10
         )
-        add_blacklist_button.grid(row=0, column=4)
+        add_blacklist_button.grid(row=0, column=5)
+        
+        # 현재 기준 학생에 대해 누적된 배려 대상 학생들 표시
+        self.blacklist_group_label_var = tk.StringVar(value="현재 추가 대상: (없음)")
+        group_label = ttk.Label(
+            input_frame,
+            textvariable=self.blacklist_group_label_var,
+            font=(DEFAULT_FONT_SMALL[0], 9)
+        )
+        group_label.grid(row=1, column=0, columnspan=6, sticky=tk.W, pady=(8, 0))
         
         # 블랙리스트 목록 표시
         list_frame = ttk.Frame(blacklist_frame)
@@ -520,36 +540,100 @@ class DormitoryAllocationGUI:
             error_label.grid(row=0, column=0, sticky=tk.W)
     
     def add_blacklist_pair(self):
-        """블랙리스트 조합 추가"""
+        """블랙리스트 조합 추가
+        - 학생 ID 1 한 명에 대해
+        - 여러 명의 학생을 한 번에 (1↔2,3,4,5 형태로) 추가할 수 있도록 확장
+        """
         try:
-            student1 = int(self.blacklist_student1_var.get().strip())
-            student2 = int(self.blacklist_student2_var.get().strip())
-            
-            if student1 == student2:
-                messagebox.showwarning("경고", "같은 학생 ID를 입력할 수 없습니다.")
+            student1_str = self.blacklist_student1_var.get().strip()
+            if not student1_str:
+                messagebox.showwarning("경고", "학생 ID 1을 입력해주세요.")
                 return
+            student1 = int(student1_str)
             
-            if student1 < 1 or student1 > 100 or student2 < 1 or student2 > 100:
+            # 기준 학생 범위 체크
+            if student1 < 1 or student1 > 100:
                 messagebox.showwarning("경고", "학생 ID는 1부터 100 사이의 숫자여야 합니다.")
                 return
             
-            # 정렬하여 중복 체크
-            pair = tuple(sorted([student1, student2]))
+            # + 버튼으로 누적된 대상들이 있으면 그것을 사용,
+            # 없으면 학생 ID 2 입력값 한 명만 사용
+            targets = list(self.blacklist_group_targets)
+            if not targets:
+                student2_str = self.blacklist_student2_var.get().strip()
+                if not student2_str:
+                    messagebox.showwarning("경고", "학생 ID 2를 입력하거나 + 버튼으로 대상을 추가해주세요.")
+                    return
+                targets = [int(student2_str)]
             
-            # 중복 체크
-            if pair in self.blacklist_pairs:
-                messagebox.showinfo("알림", "이미 추가된 조합입니다.")
+            added_count = 0
+            for student2 in targets:
+                if student1 == student2:
+                    # 같은 학생은 스킵
+                    continue
+                
+                if student2 < 1 or student2 > 100:
+                    # 범위 밖이면 스킵
+                    continue
+                
+                # 정렬하여 중복 체크
+                pair = tuple(sorted([student1, student2]))
+                
+                # 중복 체크
+                if pair in self.blacklist_pairs:
+                    continue
+                
+                # 추가
+                self.blacklist_pairs.append(pair)
+                added_count += 1
+            
+            if added_count == 0:
+                messagebox.showinfo("알림", "추가할 새로운 조합이 없습니다.")
                 return
             
-            # 추가
-            self.blacklist_pairs.append(pair)
+            # 표시 갱신
             self.update_blacklist_display()
             
-            # 입력 필드 초기화
+            # 입력 필드 및 임시 대상 초기화
             self.blacklist_student1_var.set("")
             self.blacklist_student2_var.set("")
+            self.blacklist_group_targets.clear()
+            self.blacklist_group_label_var.set("현재 추가 대상: (없음)")
             
-            self.status_var.set(f"블랙리스트 추가됨: 학생{student1} ↔ 학생{student2} (총 {len(self.blacklist_pairs)}개)")
+            self.status_var.set(
+                f"블랙리스트 추가됨: 학생{student1} ↔ {added_count}명의 학생 (총 {len(self.blacklist_pairs)}개)"
+            )
+            
+        except ValueError:
+            messagebox.showerror("오류", "올바른 숫자를 입력해주세요.")
+    
+    def add_blacklist_target(self):
+        """한 학생(학생 ID 1)에 대해 여러 명의 배려 대상 학생을 미리 모아두는 기능 (+ 버튼)"""
+        try:
+            student2_str = self.blacklist_student2_var.get().strip()
+            if not student2_str:
+                messagebox.showwarning("경고", "학생 ID 2를 입력해주세요.")
+                return
+            
+            student2 = int(student2_str)
+            
+            if student2 < 1 or student2 > 100:
+                messagebox.showwarning("경고", "학생 ID는 1부터 100 사이의 숫자여야 합니다.")
+                return
+            
+            # 이미 임시 목록에 있는지 체크
+            if student2 in self.blacklist_group_targets:
+                messagebox.showinfo("알림", "이미 추가 대상에 포함된 학생입니다.")
+                return
+            
+            self.blacklist_group_targets.append(student2)
+            
+            # 라벨 텍스트 갱신
+            targets_text = ", ".join(str(x) for x in self.blacklist_group_targets)
+            self.blacklist_group_label_var.set(f"현재 추가 대상: {targets_text}")
+            
+            # 입력 필드 비우기
+            self.blacklist_student2_var.set("")
             
         except ValueError:
             messagebox.showerror("오류", "올바른 숫자를 입력해주세요.")
