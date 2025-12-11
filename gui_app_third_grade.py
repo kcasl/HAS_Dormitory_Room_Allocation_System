@@ -2,6 +2,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
 import sys
+import hashlib
+import base64
+import ctypes
+from ctypes import wintypes, byref, POINTER, c_char, c_void_p
 import pandas as pd
 from datetime import datetime
 from allocation_engine_third_grade import allocate_rooms
@@ -13,6 +17,358 @@ if sys.platform == "win32":
 else:
     DEFAULT_FONT = ("맑은 고딕",)
     DEFAULT_FONT_SMALL = ("맑은 고딕",)
+
+
+# -----------------------------
+# 비밀번호 관리 유틸리티
+# -----------------------------
+PASSWORD_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "has_dormitory_password.txt",
+)
+
+
+def _hash_password(password: str) -> str:
+    """비밀번호를 해시(SHA-256)로 변환"""
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def _load_password_hash() -> str | None:
+    """
+    저장된 비밀번호 해시 불러오기 (없으면 None)
+    - Windows: DPAPI로 암호화된 값을 복호화
+    - 그 외 OS: 평문 해시 문자열 그대로 사용
+    - 기존 버전에서 저장한 평문 해시(txt)도 자동 인식
+    """
+    if not os.path.exists(PASSWORD_FILE):
+        return None
+    try:
+        with open(PASSWORD_FILE, "r", encoding="utf-8") as f:
+            value = f.read().strip()
+            if not value:
+                return None
+
+        # 새 포맷: base64(DPAPI(해시값))  또는 base64(해시값)
+        try:
+            raw = base64.b64decode(value.encode("ascii"), validate=True)
+
+            # Windows에서는 DPAPI로 복호화 시도
+            if sys.platform == "win32":
+                try:
+                    raw = _dpapi_decrypt(raw)
+                except Exception:
+                    # DPAPI 복호화 실패 시, 이미 평문 해시가 base64로 저장된 경우로 간주
+                    pass
+
+            return raw.decode("utf-8")
+        except Exception:
+            # 구버전: 평문 해시가 그대로 들어있는 경우
+            return value or None
+    except Exception:
+        return None
+
+
+def _save_password_hash(pw_hash: str) -> None:
+    """
+    비밀번호 해시 저장
+    - Windows: DPAPI로 암호화한 뒤 base64 인코딩하여 저장
+    - 그 외 OS: 해시 문자열을 그대로 저장
+    """
+    data = pw_hash.encode("utf-8")
+
+    if sys.platform == "win32":
+        try:
+            data = _dpapi_encrypt(data)
+        except Exception:
+            # DPAPI 실패 시에도 최소한 동작하도록, 평문 해시를 그대로 저장
+            data = pw_hash.encode("utf-8")
+
+    encoded = base64.b64encode(data).decode("ascii")
+
+    with open(PASSWORD_FILE, "w", encoding="utf-8") as f:
+        f.write(encoded)
+
+
+def _dpapi_encrypt(data: bytes) -> bytes:
+    """Windows DPAPI(CryptProtectData)를 사용해 현재 사용자 계정 기준으로 데이터 암호화"""
+    # Windows가 아니면 그대로 반환
+    if sys.platform != "win32":
+        return data
+
+    class DATA_BLOB(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD), ("pbData", POINTER(c_char))]
+
+    CryptProtectData = ctypes.windll.crypt32.CryptProtectData
+    CryptProtectData.argtypes = [
+        POINTER(DATA_BLOB),  # pDataIn
+        wintypes.LPCWSTR,    # szDataDescr
+        POINTER(DATA_BLOB),  # pOptionalEntropy
+        c_void_p,            # pvReserved
+        c_void_p,            # pPromptStruct
+        wintypes.DWORD,      # dwFlags
+        POINTER(DATA_BLOB),  # pDataOut
+    ]
+    CryptProtectData.restype = wintypes.BOOL
+
+    LocalFree = ctypes.windll.kernel32.LocalFree
+    LocalFree.argtypes = [c_void_p]
+    LocalFree.restype = c_void_p
+
+    in_blob = DATA_BLOB()
+    in_blob.cbData = len(data)
+    in_blob.pbData = ctypes.cast(ctypes.create_string_buffer(data), POINTER(c_char))
+
+    out_blob = DATA_BLOB()
+
+    if not CryptProtectData(byref(in_blob), None, None, None, None, 0, byref(out_blob)):
+        raise RuntimeError("CryptProtectData failed")
+
+    try:
+        encrypted = ctypes.string_at(out_blob.pbData, out_blob.cbData)
+    finally:
+        LocalFree(out_blob.pbData)
+
+    return encrypted
+
+
+def _dpapi_decrypt(data: bytes) -> bytes:
+    """Windows DPAPI(CryptUnprotectData)를 사용해 데이터 복호화"""
+    # Windows가 아니면 그대로 반환
+    if sys.platform != "win32":
+        return data
+
+    class DATA_BLOB(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD), ("pbData", POINTER(c_char))]
+
+    CryptUnprotectData = ctypes.windll.crypt32.CryptUnprotectData
+    CryptUnprotectData.argtypes = [
+        POINTER(DATA_BLOB),  # pDataIn
+        POINTER(wintypes.LPWSTR),  # ppszDataDescr
+        POINTER(DATA_BLOB),  # pOptionalEntropy
+        c_void_p,            # pvReserved
+        c_void_p,            # pPromptStruct
+        wintypes.DWORD,      # dwFlags
+        POINTER(DATA_BLOB),  # pDataOut
+    ]
+    CryptUnprotectData.restype = wintypes.BOOL
+
+    LocalFree = ctypes.windll.kernel32.LocalFree
+    LocalFree.argtypes = [c_void_p]
+    LocalFree.restype = c_void_p
+
+    in_blob = DATA_BLOB()
+    in_blob.cbData = len(data)
+    in_blob.pbData = ctypes.cast(ctypes.create_string_buffer(data), POINTER(c_char))
+
+    out_blob = DATA_BLOB()
+    descr = wintypes.LPWSTR()
+
+    if not CryptUnprotectData(byref(in_blob), byref(descr), None, None, None, 0, byref(out_blob)):
+        raise RuntimeError("CryptUnprotectData failed")
+
+    try:
+        decrypted = ctypes.string_at(out_blob.pbData, out_blob.cbData)
+    finally:
+        LocalFree(out_blob.pbData)
+        if descr:
+            LocalFree(descr)
+
+    return decrypted
+
+
+class PasswordWindow:
+    """
+    프로그램 실행 시 비밀번호를 설정/입력하는 간단한 로그인 창
+    - 처음 실행(비밀번호 미설정): 초기 비밀번호를 설정
+    - 이후 실행: 비밀번호를 입력하여 로그인
+    로그인에 성공하면 전달받은 on_success 콜백을 호출하여 메인 GUI를 띄움
+    """
+
+    def __init__(self, root: tk.Tk, on_success):
+        self.root = root
+        self.on_success = on_success
+
+        # 저장된 비밀번호 해시 확인
+        self.stored_hash = _load_password_hash()
+
+        # Tk 변수들
+        self.password_var = tk.StringVar()
+        self.password_confirm_var = tk.StringVar()
+        self.message_var = tk.StringVar(value="")
+
+        # 창 기본 설정 (작은 로그인 창 크기)
+        self.root.title("생활관 호실 배정 프로그램 - 로그인")
+        self.root.geometry("420x260")
+        self.root.resizable(False, False)
+
+        self._build_ui()
+
+    @property
+    def is_first_run(self) -> bool:
+        """비밀번호가 아직 설정되지 않은 경우 True"""
+        return self.stored_hash is None
+
+    def _build_ui(self):
+        # 기존 위젯 제거
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        container = ttk.Frame(self.root, padding=30)
+        container.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+
+        # 제목
+        title_text = (
+            "초기 비밀번호 설정" if self.is_first_run else "비밀번호 입력"
+        )
+        title_label = ttk.Label(
+            container,
+            text=title_text,
+            font=(DEFAULT_FONT[0], 14, "bold"),
+        )
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
+
+        # 안내 문구
+        if self.is_first_run:
+            desc = "처음 실행입니다. 앞으로 사용할 로그인 비밀번호를 설정해주세요."
+        else:
+            desc = "프로그램에 접속하기 위해 비밀번호를 입력해주세요."
+
+        desc_label = ttk.Label(
+            container,
+            text=desc,
+            font=(DEFAULT_FONT_SMALL[0], 9),
+            wraplength=340,
+        )
+        desc_label.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(0, 15))
+
+        # 비밀번호 입력
+        ttk.Label(
+            container,
+            text="비밀번호:",
+            font=(DEFAULT_FONT_SMALL[0], 10),
+        ).grid(row=2, column=0, sticky=tk.W, pady=(0, 8))
+
+        password_entry = ttk.Entry(
+            container,
+            textvariable=self.password_var,
+            show="*",
+            width=25,
+            font=(DEFAULT_FONT_SMALL[0], 10),
+        )
+        password_entry.grid(row=2, column=1, sticky=tk.W, pady=(0, 8))
+
+        # 첫 실행일 때만 비밀번호 확인 입력창 표시
+        if self.is_first_run:
+            ttk.Label(
+                container,
+                text="비밀번호 확인:",
+                font=(DEFAULT_FONT_SMALL[0], 10),
+            ).grid(row=3, column=0, sticky=tk.W, pady=(0, 8))
+
+            confirm_entry = ttk.Entry(
+                container,
+                textvariable=self.password_confirm_var,
+                show="*",
+                width=25,
+                font=(DEFAULT_FONT_SMALL[0], 10),
+            )
+            confirm_entry.grid(row=3, column=1, sticky=tk.W, pady=(0, 8))
+
+            row_for_button = 4
+        else:
+            row_for_button = 3
+
+        # 상태/메시지 라벨
+        message_label = ttk.Label(
+            container,
+            textvariable=self.message_var,
+            font=(DEFAULT_FONT_SMALL[0], 9),
+            foreground="red",
+        )
+        message_label.grid(row=row_for_button, column=0, columnspan=2, sticky=tk.W, pady=(5, 10))
+
+        # 버튼
+        if self.is_first_run:
+            btn_text = "비밀번호 설정 후 시작"
+            command = self._handle_set_password
+        else:
+            btn_text = "로그인"
+            command = self._handle_login
+
+        action_button = ttk.Button(
+            container,
+            text=btn_text,
+            command=command,
+            width=25,
+        )
+        action_button.grid(row=row_for_button + 1, column=0, columnspan=2, pady=(10, 0))
+
+        # 엔터키 처리
+        self.root.bind("<Return>", lambda event: command())
+
+        # 포커스
+        password_entry.focus_set()
+
+    def _enter_main_app(self):
+        """로그인 성공 시 메인 GUI로 전환"""
+        # 엔터 키 바인딩 해제
+        self.root.unbind("<Return>")
+        # 기존 위젯 제거 후 메인 앱 실행
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.on_success()
+
+    def _handle_set_password(self):
+        """초기 비밀번호 설정 처리"""
+        pw = self.password_var.get().strip()
+        pw_confirm = self.password_confirm_var.get().strip()
+
+        if not pw or not pw_confirm:
+            self.message_var.set("비밀번호와 비밀번호 확인을 모두 입력해주세요.")
+            return
+
+        if len(pw) < 4:
+            self.message_var.set("비밀번호는 최소 4자리 이상으로 설정해주세요.")
+            return
+
+        if pw != pw_confirm:
+            self.message_var.set("비밀번호와 비밀번호 확인이 일치하지 않습니다.")
+            return
+
+        try:
+            pw_hash = _hash_password(pw)
+            _save_password_hash(pw_hash)
+            self.stored_hash = pw_hash
+            messagebox.showinfo("설정 완료", "비밀번호가 저장되었습니다.\n프로그램에 접속합니다.")
+            self._enter_main_app()
+        except Exception as e:
+            messagebox.showerror("오류", f"비밀번호 저장 중 오류가 발생했습니다:\n{e}")
+
+    def _handle_login(self):
+        """기존 비밀번호로 로그인 처리"""
+        pw = self.password_var.get().strip()
+
+        if not pw:
+            self.message_var.set("비밀번호를 입력해주세요.")
+            return
+
+        if self.stored_hash is None:
+            # 예외적으로 파일이 사라진 경우: 다시 설정 모드로 전환
+            self.message_var.set("저장된 비밀번호를 찾을 수 없습니다. 다시 설정해주세요.")
+            self.stored_hash = None
+            self.password_var.set("")
+            self.password_confirm_var.set("")
+            self._build_ui()
+            return
+
+        if _hash_password(pw) == self.stored_hash:
+            self.message_var.set("")
+            self._enter_main_app()
+        else:
+            self.message_var.set("비밀번호가 올바르지 않습니다. 다시 입력해주세요.")
+            self.password_var.set("")
 
 
 class DormitoryAllocationGUI:
@@ -919,7 +1275,15 @@ class DormitoryAllocationGUI:
 
 def main():
     root = tk.Tk()
-    app = DormitoryAllocationGUI(root)
+
+    # 로그인/비밀번호 창에서 로그인 성공 시 호출될 콜백
+    def start_main_gui():
+        # 메인 프로그램 GUI 생성
+        DormitoryAllocationGUI(root)
+
+    # 프로그램 시작 시 항상 비밀번호 창을 먼저 띄움
+    PasswordWindow(root, on_success=start_main_gui)
+
     root.mainloop()
 
 
